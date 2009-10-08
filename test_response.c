@@ -27,7 +27,7 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(33);
+  tests(34);
   
 #define PARSE(s, last_len, exp, comment)				\
   num_headers = sizeof(headers) / sizeof(headers[0]);			\
@@ -77,6 +77,7 @@ int main(void)
   ok(minor_version == 0, "minor_version");
   ok(status == 500, "status");
   ok(strrcmp(msg, msg_len, "Internal Server Error"), "msg");
+  ok(msg_len == sizeof("Internal Server Error")-1, "msg_len");
 
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
 	-2, "slowloris (incomplete)");
