@@ -49,63 +49,8 @@ static int is_complete(const char* buf, const char* buf_end, size_t last_len)
   return -2;
 }
 
-int phr_parse_request(const char* _buf, size_t len, const char** method,
-		      size_t* method_len, const char** path, size_t* path_len,
-		      int* minor_version, struct phr_header* headers,
-		      size_t* num_headers, size_t last_len)
-{
-  const char * buf = _buf, * buf_end = buf + len;
-  size_t max_headers;
-  
-  /* if last_len != 0, check if the request is complete (a fast countermeasure
-     againt slowloris */
-  if (last_len != 0) {
-    int r = is_complete(buf, buf_end, last_len);
-    if (r != 0) {
-      return r;
-    }
-  }
-  
-  /* skip first empty line (some clients add CRLF after POST content) */
-  CHECK_EOF();
-  if (*buf == '\r') {
-    ++buf;
-    EXPECT('\n');
-  } else if (*buf == '\n') {
-    ++buf;
-  }
-  
-  /* parse request line */
-  *method = buf;
-  ADVANCE_TOKEN();
-  *method_len = buf - *method;
-  ++buf;
-  *path = buf;
-  ADVANCE_TOKEN();
-  *path_len = buf - *path;
-  ++buf;
-  EXPECT('H'); EXPECT('T'); EXPECT('T'); EXPECT('P'); EXPECT('/'); EXPECT('1');
-  EXPECT('.');
-  *minor_version = 0;
-  for (; ; ++buf) {
-    CHECK_EOF();
-    if ('0' <= *buf && *buf <= '9') {
-      *minor_version = *minor_version * 10 + *buf - '0';
-    } else {
-      break;
-    }
-  }
-  if (*buf == '\r') {
-    ++buf;
-    EXPECT('\n');
-  } else if (*buf == '\n') {
-    ++buf;
-  } else {
-    return -1;
-  }
-
-  /* parse headers */
-  max_headers = *num_headers;
+static int parse_headers(const char *buf, const char *_buf, const char *buf_end, struct phr_header* headers, size_t* num_headers) {
+  size_t max_headers = *num_headers;
   for (*num_headers = 0; ; ++*num_headers) {
     CHECK_EOF();
     if (*buf == '\r') {
@@ -157,8 +102,133 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
       }
     }
   }
-  
   return buf - _buf;
+}
+
+int phr_parse_request(const char* _buf, size_t len, const char** method,
+		      size_t* method_len, const char** path, size_t* path_len,
+		      int* minor_version, struct phr_header* headers,
+		      size_t* num_headers, size_t last_len)
+{
+  const char * buf = _buf, * buf_end = buf + len;
+  
+  /* if last_len != 0, check if the request is complete (a fast countermeasure
+     againt slowloris */
+  if (last_len != 0) {
+    int r = is_complete(buf, buf_end, last_len);
+    if (r != 0) {
+      return r;
+    }
+  }
+  
+  /* skip first empty line (some clients add CRLF after POST content) */
+  CHECK_EOF();
+  if (*buf == '\r') {
+    ++buf;
+    EXPECT('\n');
+  } else if (*buf == '\n') {
+    ++buf;
+  }
+  
+  /* parse request line */
+  *method = buf;
+  ADVANCE_TOKEN();
+  *method_len = buf - *method;
+  ++buf;
+  *path = buf;
+  ADVANCE_TOKEN();
+  *path_len = buf - *path;
+  ++buf;
+  EXPECT('H'); EXPECT('T'); EXPECT('T'); EXPECT('P'); EXPECT('/'); EXPECT('1');
+  EXPECT('.');
+  *minor_version = 0;
+  for (; ; ++buf) {
+    CHECK_EOF();
+    if ('0' <= *buf && *buf <= '9') {
+      *minor_version = *minor_version * 10 + *buf - '0';
+    } else {
+      break;
+    }
+  }
+  if (*buf == '\r') {
+    ++buf;
+    EXPECT('\n');
+  } else if (*buf == '\n') {
+    ++buf;
+  } else {
+    return -1;
+  }
+
+  return parse_headers(buf, _buf, buf_end, headers, num_headers);
+}
+
+int phr_parse_response(const char* _buf, size_t len, int *minor_version,
+                        int *status, const char **msg, size_t *msg_len,
+		      struct phr_header* headers, size_t* num_headers,
+                      size_t last_len)
+{
+  const char * buf = _buf, * buf_end = buf + len;
+  
+  /* if last_len != 0, check if the response is complete (a fast countermeasure
+     againt slowloris */
+  if (last_len != 0) {
+    int r = is_complete(buf, buf_end, last_len);
+    if (r != 0) {
+      return r;
+    }
+  }
+  
+  /* skip first empty line (some clients add CRLF after POST content) */
+  /* is this needed for response parser? -- tokuhirom */
+  CHECK_EOF();
+  if (*buf == '\r') {
+    ++buf;
+    EXPECT('\n');
+  } else if (*buf == '\n') {
+    ++buf;
+  }
+  
+  /* parse request line */
+  EXPECT('H'); EXPECT('T'); EXPECT('T'); EXPECT('P'); EXPECT('/'); EXPECT('1');
+  EXPECT('.');
+  *minor_version = 0;
+  for (; ; ++buf) {
+    CHECK_EOF();
+    if ('0' <= *buf && *buf <= '9') {
+      *minor_version = *minor_version * 10 + *buf - '0';
+    } else {
+      break;
+    }
+  }
+  ++buf; /* skip space */
+  *status = 0;
+  for (; ; ++buf) {
+    CHECK_EOF();
+    if ('0' <= *buf && *buf <= '9') {
+      *status = *status * 10 + *buf - '0';
+    } else {
+      break;
+    }
+  }
+  ++buf; /* skip space */
+  *msg = buf;
+  for (; ; ++buf) {
+    CHECK_EOF();
+    if (*buf == '\r' || *buf == '\n') {
+      break;
+    }
+  }
+  *msg_len = buf - *msg;
+  if (*buf == '\r') {
+    ++buf;
+    EXPECT('\n');
+  } else if (*buf == '\n') {
+    ++buf;
+  } else {
+    return -1;
+  }
+
+  return parse_headers(buf, _buf, buf_end, headers, num_headers);
 }
 
 #undef CHECK_EOF

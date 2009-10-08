@@ -18,4 +18,10 @@ int phr_parse_request(const char* buf, size_t len, const char** method,
 		      struct phr_header* headers, size_t* num_headers,
 		      size_t last_len);
 
+/* ditto */
+int phr_parse_response(const char* _buf, size_t len, int *minor_version,
+              int *status, const char **msg, size_t *msg_len,
+              struct phr_header* headers, size_t* num_headers,
+              size_t last_len);
+
 #endif
