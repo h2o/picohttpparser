@@ -242,4 +242,4 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
 
 #undef CHECK_EOF
 #undef EXPECT_CHAR
-#undef ADVACE_TOKEN
+#undef ADVANCE_TOKEN
