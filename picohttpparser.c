@@ -6,10 +6,10 @@
     return -2;		\
   }
 
-#define EXPECT(ch)    \
-  CHECK_EOF();	      \
-  if (*buf++ != ch) { \
-    return -1;	      \
+#define EXPECT_CHAR(ch) \
+  CHECK_EOF();		\
+  if (*buf++ != ch) {	\
+    return -1;		\
   }
 
 #define ADVANCE_TOKEN()			       \
@@ -32,7 +32,7 @@ static int is_complete(const char* buf, const char* buf_end, size_t last_len)
     if (*buf == '\r') {
       ++buf;
       CHECK_EOF();
-      EXPECT('\n');
+      EXPECT_CHAR('\n');
       ++ret_cnt;
     } else if (*buf == '\n') {
       ++buf;
@@ -49,13 +49,15 @@ static int is_complete(const char* buf, const char* buf_end, size_t last_len)
   return -2;
 }
 
-static int parse_headers(const char *buf, const char *_buf, const char *buf_end, struct phr_header* headers, size_t* num_headers) {
+static int parse_headers(const char *buf, const char *_buf, const char *buf_end,
+			 struct phr_header* headers, size_t* num_headers)
+{
   size_t max_headers = *num_headers;
   for (*num_headers = 0; ; ++*num_headers) {
     CHECK_EOF();
     if (*buf == '\r') {
       ++buf;
-      EXPECT('\n');
+      EXPECT_CHAR('\n');
       break;
     } else if (*buf == '\n') {
       ++buf;
@@ -65,7 +67,8 @@ static int parse_headers(const char *buf, const char *_buf, const char *buf_end,
       return -1;
     }
     if (*num_headers == 0 || ! (*buf == ' ' || *buf == '\t')) {
-      /* parsing name */
+      /* parsing name, but do not discard SP before colon, see
+       * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
       headers[*num_headers].name = buf;
       for (; ; ++buf) {
 	CHECK_EOF();
@@ -93,7 +96,7 @@ static int parse_headers(const char *buf, const char *_buf, const char *buf_end,
       if (*buf == '\r') {
 	headers[*num_headers].value_len = buf - headers[*num_headers].value;
 	++buf;
-	EXPECT('\n');
+	EXPECT_CHAR('\n');
 	break;
       } else if (*buf == '\n') {
 	headers[*num_headers].value_len = buf - headers[*num_headers].value;
@@ -125,7 +128,7 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
   CHECK_EOF();
   if (*buf == '\r') {
     ++buf;
-    EXPECT('\n');
+    EXPECT_CHAR('\n');
   } else if (*buf == '\n') {
     ++buf;
   }
@@ -139,8 +142,8 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
   ADVANCE_TOKEN();
   *path_len = buf - *path;
   ++buf;
-  EXPECT('H'); EXPECT('T'); EXPECT('T'); EXPECT('P'); EXPECT('/'); EXPECT('1');
-  EXPECT('.');
+  EXPECT_CHAR('H'); EXPECT_CHAR('T'); EXPECT_CHAR('T'); EXPECT_CHAR('P');
+  EXPECT_CHAR('/'); EXPECT_CHAR('1'); EXPECT_CHAR('.');
   *minor_version = 0;
   for (; ; ++buf) {
     CHECK_EOF();
@@ -152,7 +155,7 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
   }
   if (*buf == '\r') {
     ++buf;
-    EXPECT('\n');
+    EXPECT_CHAR('\n');
   } else if (*buf == '\n') {
     ++buf;
   } else {
@@ -163,14 +166,14 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
 }
 
 int phr_parse_response(const char* _buf, size_t len, int *minor_version,
-                        int *status, const char **msg, size_t *msg_len,
-		      struct phr_header* headers, size_t* num_headers,
-                      size_t last_len)
+		       int *status, const char **msg, size_t *msg_len,
+		       struct phr_header* headers, size_t* num_headers,
+		       size_t last_len)
 {
   const char * buf = _buf, * buf_end = buf + len;
   
   /* if last_len != 0, check if the response is complete (a fast countermeasure
-     againt slowloris */
+     against slowloris */
   if (last_len != 0) {
     int r = is_complete(buf, buf_end, last_len);
     if (r != 0) {
@@ -183,14 +186,14 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
   CHECK_EOF();
   if (*buf == '\r') {
     ++buf;
-    EXPECT('\n');
+    EXPECT_CHAR('\n');
   } else if (*buf == '\n') {
     ++buf;
   }
   
   /* parse request line */
-  EXPECT('H'); EXPECT('T'); EXPECT('T'); EXPECT('P'); EXPECT('/'); EXPECT('1');
-  EXPECT('.');
+  EXPECT_CHAR('H'); EXPECT_CHAR('T'); EXPECT_CHAR('T'); EXPECT_CHAR('P'); EXPECT_CHAR('/'); EXPECT_CHAR('1');
+  EXPECT_CHAR('.');
   *minor_version = 0;
   for (; ; ++buf) {
     CHECK_EOF();
@@ -221,7 +224,7 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
   *msg_len = buf - *msg;
   if (*buf == '\r') {
     ++buf;
-    EXPECT('\n');
+    EXPECT_CHAR('\n');
   } else if (*buf == '\n') {
     ++buf;
   } else {
@@ -232,5 +235,5 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
 }
 
 #undef CHECK_EOF
-#undef EXPECT
+#undef EXPECT_CHAR
 #undef ADVACE_TOKEN
