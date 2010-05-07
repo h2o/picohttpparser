@@ -27,7 +27,7 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(34);
+  tests(47);
   
 #define PARSE(s, last_len, exp, comment)				\
   num_headers = sizeof(headers) / sizeof(headers[0]);			\
