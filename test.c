@@ -28,7 +28,7 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(28);
+  tests(36);
   
 #define PARSE(s, last_len, exp, comment)				\
   num_headers = sizeof(headers) / sizeof(headers[0]);			\
@@ -71,6 +71,15 @@ int main(void)
   ok(headers[2].name == NULL, "header #3");
   ok(strrcmp(headers[2].value, headers[2].value_len, "  \tc"),
      "header #3 value");
+  
+  PARSE("GET", 0, -2, "incomplete 1");
+  PARSE("GET ", 0, -2, "incomplete 2");
+  PARSE("GET /", 0, -2, "incomplete 3");
+  PARSE("GET / ", 0, -2, "incomplete 4");
+  PARSE("GET / H", 0, -2, "incomplete 5");
+  PARSE("GET / HTTP/1.", 0, -2, "incomplete 6");
+  PARSE("GET / HTTP/1.0", 0, -2, "incomplete 7");
+  PARSE("GET / HTTP/1.0\r", 0, -2, "incomplete 8");
   
   PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
 	-2, "slowloris (incomplete)");
