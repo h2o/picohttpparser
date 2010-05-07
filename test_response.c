@@ -78,7 +78,18 @@ int main(void)
   ok(status == 500, "status");
   ok(strrcmp(msg, msg_len, "Internal Server Error"), "msg");
   ok(msg_len == sizeof("Internal Server Error")-1, "msg_len");
-
+  
+  PARSE("H", 0, -2, "incomplete 1");
+  PARSE("HTTP/1.", 0, -2, "incomplete 2");
+  PARSE("HTTP/1.1", 0, -2, "incomplete 3");
+  PARSE("HTTP/1.1 ", 0, -2, "incomplete 4");
+  PARSE("HTTP/1.1 2", 0, -2, "incomplete 5");
+  PARSE("HTTP/1.1 200", 0, -2, "incomplete 6");
+  PARSE("HTTP/1.1 200 ", 0, -2, "incomplete 7");
+  PARSE("HTTP/1.1 200 O", 0, -2, "incomplete 8");
+  PARSE("HTTP/1.1 200 OK\r", 0, -2, "incomplete 9");
+  PARSE("HTTP/1.1 200 OK\r\n", 0, -2, "incomplete 10");
+  
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
 	-2, "slowloris (incomplete)");
   PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
