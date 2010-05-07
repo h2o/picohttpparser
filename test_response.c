@@ -84,6 +84,10 @@ int main(void)
   PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
 	0, "slowloris (complete)");
   
+  PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
+  PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
+  PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
+  
 #undef PARSE
   
   return 0;
