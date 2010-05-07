@@ -107,7 +107,7 @@ static int parse_http_version(const char** _buf, const char* buf_end,
   return 0;
 }
 
-static int parse_headers(const char* buf, const char* _buf, const char *buf_end,
+static int parse_headers(const char* buf, const char* _buf, const char* buf_end,
 			 struct phr_header* headers, size_t* num_headers)
 {
   size_t max_headers = *num_headers;
@@ -202,8 +202,8 @@ int phr_parse_request(const char* _buf, size_t len, const char** method,
   return parse_headers(buf, _buf, buf_end, headers, num_headers);
 }
 
-int phr_parse_response(const char* _buf, size_t len, int *minor_version,
-		       int *status, const char **msg, size_t *msg_len,
+int phr_parse_response(const char* _buf, size_t len, int* minor_version,
+		       int* status, const char** msg, size_t* msg_len,
 		       struct phr_header* headers, size_t* num_headers,
 		       size_t last_len)
 {
