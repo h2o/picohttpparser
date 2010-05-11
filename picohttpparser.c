@@ -1,8 +1,16 @@
 #include <stddef.h>
 #include "picohttpparser.h"
 
+#ifdef __GNUC__
+# define likely(x)	__builtin_expect(!!(x), 1)
+# define unlikely(x)	__builtin_expect(!!(x), 0)
+#else
+# define likely(x) (x)
+# define unlikely(x) (x)
+#endif
+
 #define CHECK_EOF()	\
-  if (buf == buf_end) { \
+  if (buf == buf_end) {	\
     *ret = -2;		\
     return NULL;	\
   }
@@ -29,23 +37,24 @@
     toklen = buf - tok_start;			       \
   } while (0)
 
-#define ADVANCE_EOL(tok, toklen) do {	      \
-    const char* tok_start = buf;	      \
-    for (; ; ++buf) {			      \
-      CHECK_EOF();			      \
-      if (*buf == '\r' || *buf == '\n') {     \
-	break;				      \
-      }					      \
-    }					      \
-    if (*buf == '\r') {			      \
-      ++buf;				      \
-      EXPECT_CHAR('\n');		      \
-      toklen = buf - 2 - tok_start;	      \
-    } else { /* should be: *buf == '\n' */    \
-      toklen = buf - tok_start;		      \
-      ++buf;				      \
-    }					      \
-    tok = tok_start;			      \
+#define ADVANCE_EOL(tok, toklen) do {		   \
+    const char* tok_start = buf;		   \
+    for (; ; ++buf) {				   \
+      CHECK_EOF();				   \
+      if (unlikely((unsigned char)*buf <= '\r') && \
+	  (*buf == '\r' || *buf == '\n')) {	   \
+	break;					   \
+      }						   \
+    }						   \
+    if (*buf == '\r') {				   \
+      ++buf;					   \
+      EXPECT_CHAR('\n');			   \
+      toklen = buf - 2 - tok_start;		   \
+    } else { /* should be: *buf == '\n' */	   \
+      toklen = buf - tok_start;			   \
+      ++buf;					   \
+    }						   \
+    tok = tok_start;				   \
   } while (0)
   
 static const char* is_complete(const char* buf, const char* buf_end,
