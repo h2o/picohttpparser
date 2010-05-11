@@ -207,7 +207,7 @@ int phr_parse_request(const char* buf_start, size_t len, const char** method,
   *method_len = 0;
   *path = NULL;
   *path_len = 0;
-  *minor_version = 0;
+  *minor_version = -1;
   *num_headers = 0;
   
   /* if last_len != 0, check if the request is complete (a fast countermeasure
@@ -266,7 +266,7 @@ int phr_parse_response(const char* buf_start, size_t len, int* minor_version,
   size_t max_headers = *num_headers;
   int r;
   
-  *minor_version = 0;
+  *minor_version = -1;
   *status = 0;
   *msg = NULL;
   *msg_len = 0;

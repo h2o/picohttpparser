@@ -27,7 +27,7 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(47);
+  tests(61);
   
 #define PARSE(s, last_len, exp, comment)				\
   num_headers = sizeof(headers) / sizeof(headers[0]);			\
@@ -82,7 +82,7 @@ int main(void)
   PARSE("H", 0, -2, "incomplete 1");
   PARSE("HTTP/1.", 0, -2, "incomplete 2");
   PARSE("HTTP/1.1", 0, -2, "incomplete 3");
-  ok(minor_version == 0, "minor_version not ready");
+  ok(minor_version == -1, "minor_version not ready");
   PARSE("HTTP/1.1 ", 0, -2, "incomplete 4");
   ok(minor_version == 1, "minor_version ready");
   PARSE("HTTP/1.1 2", 0, -2, "incomplete 5");
@@ -97,6 +97,13 @@ int main(void)
   ok(strrcmp(msg, msg_len, "OK"), "message ready");
   PARSE("HTTP/1.1 200 OK\n", 0, -2, "incomplete 11");
   ok(strrcmp(msg, msg_len, "OK"), "message ready 2");
+
+  PARSE("HTTP/1.1 200 OK\r\nA: 1\r", 0, -2, "incomplete 11");
+  ok(num_headers == 0, "header not ready");
+  PARSE("HTTP/1.1 200 OK\r\nA: 1\r\n", 0, -2, "incomplete 12");
+  ok(num_headers == 1, "header ready");
+  ok(strrcmp(headers[0].name, headers[0].name_len, "A"), "header #1 name");
+  ok(strrcmp(headers[0].value, headers[0].value_len, "1"), "header #1 value");
   
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
 	-2, "slowloris (incomplete)");
