@@ -82,13 +82,21 @@ int main(void)
   PARSE("H", 0, -2, "incomplete 1");
   PARSE("HTTP/1.", 0, -2, "incomplete 2");
   PARSE("HTTP/1.1", 0, -2, "incomplete 3");
+  ok(minor_version == 0, "minor_version not ready");
   PARSE("HTTP/1.1 ", 0, -2, "incomplete 4");
+  ok(minor_version == 1, "minor_version ready");
   PARSE("HTTP/1.1 2", 0, -2, "incomplete 5");
   PARSE("HTTP/1.1 200", 0, -2, "incomplete 6");
+  ok(status == 0, "status not ready");
   PARSE("HTTP/1.1 200 ", 0, -2, "incomplete 7");
+  ok(status == 200, "status ready");
   PARSE("HTTP/1.1 200 O", 0, -2, "incomplete 8");
   PARSE("HTTP/1.1 200 OK\r", 0, -2, "incomplete 9");
+  ok(msg == NULL, "message not ready");
   PARSE("HTTP/1.1 200 OK\r\n", 0, -2, "incomplete 10");
+  ok(strrcmp(msg, msg_len, "OK"), "message ready");
+  PARSE("HTTP/1.1 200 OK\n", 0, -2, "incomplete 11");
+  ok(strrcmp(msg, msg_len, "OK"), "message ready 2");
   
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
 	-2, "slowloris (incomplete)");
