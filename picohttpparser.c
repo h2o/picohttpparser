@@ -44,7 +44,7 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
   const char* token_start = buf;
   
   while (1) {
-    if (likely(buf + 16 < buf_end)) {
+    if (likely(buf_end - buf >= 16)) {
       unsigned i;
       for (i = 0; i < 16; i++, ++buf) {
 	if (unlikely((unsigned char)*buf <= '\r')
