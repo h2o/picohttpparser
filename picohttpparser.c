@@ -109,12 +109,13 @@ static const char* is_complete(const char* buf, const char* buf_end,
 static const char* parse_int(const char* buf, const char* buf_end, int* value,
 			     int* ret)
 {
+  int v;
   CHECK_EOF();
   if (! ('0' <= *buf && *buf <= '9')) {
     *ret = -1;
     return NULL;
   }
-  int v = 0;
+  v = 0;
   for (; ; ++buf) {
     CHECK_EOF();
     if ('0' <= *buf && *buf <= '9') {
