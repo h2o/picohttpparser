@@ -28,7 +28,7 @@
       CHECK_EOF();				       \
       if (*buf == ' ') {			       \
 	break;					       \
-      } else if (*buf == '\r' || *buf == '\n') {       \
+      } else if (*buf == '\015' || *buf == '\012') {   \
 	*ret = -1;				       \
 	return NULL;				       \
       }						       \
@@ -47,27 +47,27 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
     if (likely(buf_end - buf >= 16)) {
       unsigned i;
       for (i = 0; i < 16; i++, ++buf) {
-	if (unlikely((unsigned char)*buf <= '\r')
-	    && (*buf == '\r' || *buf == '\n')) {
+	if (unlikely((unsigned char)*buf <= '\015')
+	    && (*buf == '\015' || *buf == '\012')) {
 	  goto EOL_FOUND;
 	}
       }
     } else {
       for (; ; ++buf) {
 	CHECK_EOF();
-	if (unlikely((unsigned char)*buf <= '\r')
-	    && (*buf == '\r' || *buf == '\n')) {
+	if (unlikely((unsigned char)*buf <= '\015')
+	    && (*buf == '\015' || *buf == '\012')) {
 	  goto EOL_FOUND;
 	}
       }
     }
   }
  EOL_FOUND:
-  if (*buf == '\r') {
+  if (*buf == '\015') {
     ++buf;
-    EXPECT_CHAR('\n');
+    EXPECT_CHAR('\012');
     *token_len = buf - 2 - token_start;
-  } else { /* should be: *buf == '\n' */
+  } else { /* should be: *buf == '\012' */
     *token_len = buf - token_start;
     ++buf;
   }
@@ -84,12 +84,12 @@ static const char* is_complete(const char* buf, const char* buf_end,
   
   while (1) {
     CHECK_EOF();
-    if (*buf == '\r') {
+    if (*buf == '\015') {
       ++buf;
       CHECK_EOF();
-      EXPECT_CHAR('\n');
+      EXPECT_CHAR('\012');
       ++ret_cnt;
-    } else if (*buf == '\n') {
+    } else if (*buf == '\012') {
       ++buf;
       ++ret_cnt;
     } else {
@@ -145,11 +145,11 @@ static const char* parse_headers(const char* buf, const char* buf_end,
 {
   for (; ; ++*num_headers) {
     CHECK_EOF();
-    if (*buf == '\r') {
+    if (*buf == '\015') {
       ++buf;
-      EXPECT_CHAR('\n');
+      EXPECT_CHAR('\012');
       break;
-    } else if (*buf == '\n') {
+    } else if (*buf == '\012') {
       ++buf;
       break;
     }
@@ -199,10 +199,10 @@ const char* parse_request(const char* buf, const char* buf_end,
 {
   /* skip first empty line (some clients add CRLF after POST content) */
   CHECK_EOF();
-  if (*buf == '\r') {
+  if (*buf == '\015') {
     ++buf;
-    EXPECT_CHAR('\n');
-  } else if (*buf == '\n') {
+    EXPECT_CHAR('\012');
+  } else if (*buf == '\012') {
     ++buf;
   }
   
@@ -214,10 +214,10 @@ const char* parse_request(const char* buf, const char* buf_end,
   if ((buf = parse_http_version(buf, buf_end, minor_version, ret)) == NULL) {
     return NULL;
   }
-  if (*buf == '\r') {
+  if (*buf == '\015') {
     ++buf;
-    EXPECT_CHAR('\n');
-  } else if (*buf == '\n') {
+    EXPECT_CHAR('\012');
+  } else if (*buf == '\012') {
     ++buf;
   } else {
     *ret = -1;
