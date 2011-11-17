@@ -1,14 +1,15 @@
 CC?=gcc
+PROVE?=prove
 
 test: build_request build_response
-	prove -e '/bin/sh -c' ./test_request
-	prove -e '/bin/sh -c' ./test_response
+	$(PROVE) -e '/bin/sh -c' ./test_request
+	$(PROVE) -e '/bin/sh -c' ./test_response
 
 test_request: build_request
-	prove -e '/bin/sh -c' ./test_request
+	$(PROVE) -e '/bin/sh -c' ./test_request
 
 test_response: build_request
-	prove -e '/bin/sh -c'./test_response
+	$(PROVE) -e '/bin/sh -c'./test_response
 
 build_request: picohttpparser.o test.o
 	$(CC) $(LDFLAGS) -o test_request $^
