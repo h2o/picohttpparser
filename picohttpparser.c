@@ -11,16 +11,20 @@
 # define unlikely(x) (x)
 #endif
 
+#define PHR_ERROR_FAILURE		(-1)		
+#define PHR_ERROR_PARTIAL		(-2)
+#define PHR_ERROR_LOWMEMORY		(-3)
+
 #define CHECK_EOF()	\
   if (buf == buf_end) {	\
-    *ret = -2;		\
+    *ret = PHR_ERROR_PARTIAL;		\
     return NULL;	\
   }
 
 #define EXPECT_CHAR(ch) \
   CHECK_EOF();		\
   if (*buf++ != ch) {	\
-    *ret = -1;		\
+    *ret = PHR_ERROR_FAILURE;		\
     return NULL;	\
   }
 
@@ -31,7 +35,7 @@
       if (*buf == ' ') {			       \
 	break;					       \
       } else if (*buf == '\015' || *buf == '\012') {   \
-	*ret = -1;				       \
+	*ret = PHR_ERROR_FAILURE;				       \
 	return NULL;				       \
       }						       \
     }						       \
@@ -113,7 +117,7 @@ static const char* is_complete(const char* buf, const char* buf_end,
     }
   }
   
-  *ret = -2;
+  *ret = PHR_ERROR_PARTIAL;
   return NULL;
 }
 
@@ -124,7 +128,7 @@ static const char* parse_int(const char* buf, const char* buf_end, int* value,
   int v;
   CHECK_EOF();
   if (! ('0' <= *buf && *buf <= '9')) {
-    *ret = -1;
+    *ret = PHR_ERROR_FAILURE;
     return NULL;
   }
   v = 0;
@@ -166,12 +170,12 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       break;
     }
     if (*num_headers == max_headers) {
-      *ret = -1;
+		*ret = PHR_ERROR_LOWMEMORY;
       return NULL;
     }
     if (! (*num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
       if (! token_char_map[(unsigned char)*buf]) {
-	*ret = -1;
+	*ret = PHR_ERROR_FAILURE;
 	return NULL;
       }
       /* parsing name, but do not discard SP before colon, see
@@ -182,7 +186,7 @@ static const char* parse_headers(const char* buf, const char* buf_end,
 	if (*buf == ':') {
 	  break;
 	} else if (*buf < ' ') {
-	  *ret = -1;
+	  *ret = PHR_ERROR_FAILURE;
 	  return NULL;
 	}
       }
@@ -236,7 +240,7 @@ const char* parse_request(const char* buf, const char* buf_end,
   } else if (*buf == '\012') {
     ++buf;
   } else {
-    *ret = -1;
+    *ret = PHR_ERROR_FAILURE;
     return NULL;
   }
   
@@ -256,7 +260,7 @@ int phr_parse_request(const char* buf_start, size_t len, const char** method,
   *method_len = 0;
   *path = NULL;
   *path_len = 0;
-  *minor_version = -1;
+  *minor_version = PHR_ERROR_FAILURE;
   *num_headers = 0;
   
   /* if last_len != 0, check if the request is complete (a fast countermeasure
@@ -288,7 +292,7 @@ static const char* parse_response(const char* buf, const char* buf_end,
   }
   /* skip space */
   if (*buf++ != ' ') {
-    *ret = -1;
+    *ret = PHR_ERROR_FAILURE;
     return NULL;
   }
   /* parse status code */
@@ -297,7 +301,7 @@ static const char* parse_response(const char* buf, const char* buf_end,
   }
   /* skip space */
   if (*buf++ != ' ') {
-    *ret = -1;
+    *ret = PHR_ERROR_FAILURE;
     return NULL;
   }
   /* get message */
@@ -317,7 +321,7 @@ int phr_parse_response(const char* buf_start, size_t len, int* minor_version,
   size_t max_headers = *num_headers;
   int r;
   
-  *minor_version = -1;
+  *minor_version = PHR_ERROR_FAILURE;
   *status = 0;
   *msg = NULL;
   *msg_len = 0;
