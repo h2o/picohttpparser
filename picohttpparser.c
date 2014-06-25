@@ -272,7 +272,7 @@ int phr_parse_request(const char* buf_start, size_t len, const char** method,
     return r;
   }
   
-  return buf - buf_start;
+  return (int)(buf - buf_start);
 }
 
 static const char* parse_response(const char* buf, const char* buf_end,
@@ -335,7 +335,7 @@ int phr_parse_response(const char* buf_start, size_t len, int* minor_version,
     return r;
   }
   
-  return buf - buf_start;
+  return (int)(buf - buf_start);
 }
 
 #undef CHECK_EOF
