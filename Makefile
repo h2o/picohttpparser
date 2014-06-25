@@ -12,10 +12,10 @@ test_response: build_request
 	$(PROVE) -e '/bin/sh -c'./test_response
 
 build_request: picohttpparser.o test.o
-	$(CC) $(LDFLAGS) -o test_request $^
+	$(CC) -Wall $(LDFLAGS) -o test_request $^
 
 build_response: picohttpparser.o test_response.o
-	$(CC) $(LDFLAGS) -o test_response $^
+	$(CC) -Wall $(LDFLAGS) -o test_response $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
