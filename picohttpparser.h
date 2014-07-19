@@ -16,7 +16,9 @@ struct phr_header {
   size_t value_len;
 };
 
-/* returns number of bytes cosumed if successful, -2 if request is partial,
+/* returns number of bytes cosumed if successful, 
+ * -3 if the number of headers supplied is not enough,
+ * -2 if request is partial,
  * -1 if failed */
 int phr_parse_request(const char* buf, size_t len, const char** method,
 		      size_t* method_len, const char** path,
