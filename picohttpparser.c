@@ -11,6 +11,8 @@
 # define unlikely(x) (x)
 #endif
 
+#define IS_PRINTABLE_ASCII(c) ((unsigned char)(c) - 040u < 0137u)
+
 #define CHECK_EOF() \
   if (buf == buf_end) { \
     *ret = -2; \
@@ -30,9 +32,11 @@
       CHECK_EOF(); \
       if (*buf == ' ') { \
         break; \
-      } else if (*buf == '\015' || *buf == '\012') { \
-        *ret = -1; \
-        return NULL; \
+      } else if (unlikely(! IS_PRINTABLE_ASCII(*buf))) { \
+        if ((unsigned char)*buf < '\040' || *buf == '\177') { \
+          *ret = -1; \
+          return NULL; \
+        } \
       } \
     } \
     tok = tok_start; \
@@ -59,29 +63,34 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
     if (likely(buf_end - buf >= 16)) {
       unsigned i;
       for (i = 0; i < 16; i++, ++buf) {
-        if (unlikely((unsigned char)*buf <= '\015')
-            && (*buf == '\015' || *buf == '\012')) {
-          goto EOL_FOUND;
+        if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
+          if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
+            goto FOUND_CTL;
+          }
         }
       }
     } else {
       for (; ; ++buf) {
         CHECK_EOF();
-        if (unlikely((unsigned char)*buf <= '\015')
-            && (*buf == '\015' || *buf == '\012')) {
-          goto EOL_FOUND;
+        if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
+          if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
+            goto FOUND_CTL;
+          }
         }
       }
     }
   }
- EOL_FOUND:
-  if (*buf == '\015') {
+ FOUND_CTL:
+  if (likely(*buf == '\015')) {
     ++buf;
     EXPECT_CHAR('\012');
     *token_len = buf - 2 - token_start;
-  } else { /* should be: *buf == '\012' */
+  } else if (*buf == '\012') {
     *token_len = buf - token_start;
     ++buf;
+  } else {
+    *ret = -1;
+    return NULL;
   }
   *token = token_start;
   
