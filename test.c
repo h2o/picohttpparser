@@ -28,11 +28,11 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(44);
+  tests(56);
   
 #define PARSE(s, last_len, exp, comment)				\
   num_headers = sizeof(headers) / sizeof(headers[0]);			\
-  ok(phr_parse_request(s, strlen(s), &method, &method_len, &path,	\
+  ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path,	\
 		       &path_len, &minor_version, headers,		\
 		       &num_headers, last_len)				\
     == (exp == 0 ? strlen(s) : exp),					\
@@ -94,6 +94,19 @@ int main(void)
   
   PARSE("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name");
   PARSE("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)");
+
+  PARSE("G\0T / HTTP/1.0\r\n\r\n", 0, -1, "NUL in method");
+  PARSE("G\tT / HTTP/1.0\r\n\r\n", 0, -1, "tab in method");
+  PARSE("GET /\x7fhello HTTP/1.0\r\n\r\n", 0, -1, "DEL in uri-path");
+  PARSE("GET / HTTP/1.0\r\na\0b: c\r\n\r\n", 0, -1, "NUL in header name");
+  PARSE("GET / HTTP/1.0\r\nab: c\0d\r\n\r\n", 0, -1, "NUL in header value");
+  PARSE("GET /\xa0 HTTP/1.0\r\nh: c\xa2y\r\n\r\n", 0, 0, "accept MSB chars");
+  ok(num_headers == 1, "# of headers");
+  ok(strrcmp(method, method_len, "GET"), "method");
+  ok(strrcmp(path, path_len, "/\xa0"), "path");
+  ok(minor_version == 0, "minor version");
+  ok(strrcmp(headers[0].name, headers[0].name_len, "h"), "header #1 name");
+  ok(strrcmp(headers[0].value, headers[0].value_len, "c\xa2y"), "header #1 value");
 
 #undef PARSE
   
