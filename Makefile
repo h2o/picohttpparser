@@ -33,7 +33,7 @@ test_request: build_request
 	$(PROVE) -e '/bin/sh -c' ./test_request
 
 test_response: build_request
-	$(PROVE) -e '/bin/sh -c'./test_response
+	$(PROVE) -e '/bin/sh -c' ./test_response
 
 build_request: picohttpparser.o test.o
 	$(CC) -Wall $(LDFLAGS) -o test_request $^
