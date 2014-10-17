@@ -9,3 +9,5 @@ All it does is accept pointer to buffer and the output structure, and setups the
 The code is widely deployed within Perl applications though popular modules that use it, including [Plack](https://metacpan.org/pod/Plack), [Starman](https://metacpan.org/pod/Starman), [Starlet](https://metacpan.org/pod/Starlet), [Furl](https://metacpan.org/pod/Furl).
 
 Check out [test.c] to find out how to use the parser.
+
+The software is dual-licensed under the Perl License or the MIT License.
