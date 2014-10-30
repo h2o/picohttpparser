@@ -25,6 +25,8 @@
 CC?=gcc
 PROVE?=prove
 
+all:
+
 test: build_request build_response
 	$(PROVE) -e '/bin/sh -c' ./test_request
 	$(PROVE) -e '/bin/sh -c' ./test_response
@@ -48,3 +50,5 @@ clean:
 	rm -f *.o
 	rm -f test_request
 	rm -f test_response
+
+.PHONY: test
