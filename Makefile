@@ -37,17 +37,13 @@ test_request: build_request
 test_response: build_request
 	$(PROVE) -e '/bin/sh -c' ./test_response
 
-build_request: picohttpparser.o test.o
+build_request: picohttpparser.c test.c
 	$(CC) -Wall $(LDFLAGS) -o test_request $^
 
-build_response: picohttpparser.o test_response.o
+build_response: picohttpparser.c test_response.c
 	$(CC) -Wall $(LDFLAGS) -o test_response $^
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $<
-
 clean:
-	rm -f *.o
 	rm -f test_request
 	rm -f test_response
 
