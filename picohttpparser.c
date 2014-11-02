@@ -84,24 +84,23 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
 {
   const char* token_start = buf;
   
-  while (1) {
-    if (likely(buf_end - buf >= 16)) {
-      unsigned i;
-      for (i = 0; i < 16; i++, ++buf) {
-        if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
-          if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
-            goto FOUND_CTL;
-          }
-        }
-      }
-    } else {
-      for (; ; ++buf) {
-        CHECK_EOF();
-        if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
-          if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
-            goto FOUND_CTL;
-          }
-        }
+  /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
+  while (likely(buf_end - buf >= 8)) {
+#define DOIT() if (unlikely(! IS_PRINTABLE_ASCII(*buf))) goto NonPrintable; ++buf
+    DOIT(); DOIT(); DOIT(); DOIT();
+    DOIT(); DOIT(); DOIT(); DOIT();
+#undef DOIT
+    continue;
+  NonPrintable:
+    if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
+      goto FOUND_CTL;
+    }
+  }
+  for (; ; ++buf) {
+    CHECK_EOF();
+    if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
+      if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
+        goto FOUND_CTL;
       }
     }
   }
