@@ -55,6 +55,25 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
               struct phr_header* headers, size_t* num_headers,
               size_t last_len);
 
+/* ditto */
+int phr_parse_headers(const char* buf, size_t len, struct phr_header* headers,
+                      size_t* num_headers, size_t last_len);
+
+/* should be zero-filled before start */
+struct phr_chunked_decoder {
+  size_t pos;
+  size_t chunk_data_size;
+  int state;
+};
+
+/* removes the headers of the chunked encoding from the buffer.  Users should
+ * repeatedly call this function while it returns -2 with newly arrived data
+ * appended to the end of the buffer.  Upon success, the function returns the
+ * length of the decoded content (which starts at `buf`), or returns -1 if
+ * failed. */
+ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                           size_t *bufsz);
+
 #ifdef __cplusplus
 }
 #endif

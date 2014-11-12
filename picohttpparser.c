@@ -23,7 +23,9 @@
  * IN THE SOFTWARE.
  */
 
+#include <assert.h>
 #include <stddef.h>
+#include <string.h>
 #include "picohttpparser.h"
 
 /* $Id$ */
@@ -369,6 +371,115 @@ int phr_parse_response(const char* buf_start, size_t len, int* minor_version,
   }
   
   return (int)(buf - buf_start);
+}
+
+int phr_parse_headers(const char* buf_start, size_t len,
+                      struct phr_header* headers, size_t* num_headers,
+                      size_t last_len)
+{
+  const char* buf = buf_start, * buf_end = buf + len;
+  size_t max_headers = *num_headers;
+  int r;
+
+  *num_headers = 0;
+
+  /* if last_len != 0, check if the response is complete (a fast countermeasure
+     against slowloris */
+  if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
+    return r;
+  }
+
+  if ((buf = parse_headers(buf, buf_end, headers, num_headers, max_headers, &r))
+      == NULL) {
+    return r;
+  }
+
+  return (int)(buf - buf_start);
+}
+
+enum {
+  CHUNKED_IN_CHUNK_SIZE,
+  CHUNKED_IN_CHUNK_EXT,
+  CHUNKED_IN_CHUNK_DATA
+};
+
+static ssize_t decode_hexnum(const char *bytes, size_t len, size_t *value)
+{
+  size_t v = 0, i;
+  int ch;
+
+  for (i = 0; i != len; ++i) {
+    if (i >= sizeof(size_t) / 4)
+      return -1;
+    ch = bytes[i];
+    if ('0' <= ch && ch <= '9') {
+      v = v * 16 + ch - '0';
+    } else if ('A' <= ch && ch <= 'F') {
+      v = v * 16 + ch - 'A' + 0xa;
+    } else if ('a' <= ch && ch <= 'f') {
+      v = v * 16 + ch - 'a' + 0xa;
+    } else {
+      if (i == 0)
+        return -1;
+      *value = v;
+      return i;
+    }
+  }
+  return -2;
+}
+
+ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                           size_t *bufsz)
+{
+  size_t data_offset = decoder->pos;
+  ssize_t ret = -2; /* incomplete */
+
+  while (1) {
+    switch (decoder->state) {
+    case CHUNKED_IN_CHUNK_SIZE:
+      if ((ret = decode_hexnum(buf + decoder->pos, *bufsz - decoder->pos,
+                               &decoder->chunk_data_size))
+          < 0)
+        goto Exit;
+      decoder->pos += ret;
+      ret = -2; /* reset to incomplete */
+      decoder->state = CHUNKED_IN_CHUNK_EXT;
+      /* fallthru */
+    case CHUNKED_IN_CHUNK_EXT:
+      /* RFC 7230 A.2 "Line folding in chunk extensions is disallowed" */
+      for (; ; ++decoder->pos) {
+        if (*bufsz - decoder->pos < 2)
+            goto Exit;
+        if (memcmp(buf + decoder->pos, "\r\n", 2) == 0)
+            break;
+      }
+      decoder->pos += 2;
+      if (decoder->chunk_data_size == 0) {
+        ret = data_offset;
+        goto Exit;
+      }
+      decoder->state = CHUNKED_IN_CHUNK_DATA;
+      /* fallthru */
+    case CHUNKED_IN_CHUNK_DATA:
+      if (*bufsz - decoder->pos < decoder->chunk_data_size)
+        goto Exit;
+      memmove(buf + data_offset, buf + decoder->pos, decoder->chunk_data_size);
+      decoder->pos += decoder->chunk_data_size;
+      data_offset += decoder->chunk_data_size;
+      decoder->state = CHUNKED_IN_CHUNK_SIZE;
+      break;
+    default:
+      assert(!"decoder is corrupt");
+    }
+  }
+
+  Exit:
+  if (data_offset != decoder->pos) {
+  memmove(buf + data_offset, buf + decoder->pos, *bufsz - decoder->pos);
+  *bufsz -= decoder->pos - data_offset;
+  decoder->pos = data_offset;
+  }
+  return ret;
 }
 
 #undef CHECK_EOF
