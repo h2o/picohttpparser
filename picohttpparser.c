@@ -475,9 +475,9 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
 
   Exit:
   if (data_offset != decoder->pos) {
-  memmove(buf + data_offset, buf + decoder->pos, *bufsz - decoder->pos);
-  *bufsz -= decoder->pos - data_offset;
-  decoder->pos = data_offset;
+    memmove(buf + data_offset, buf + decoder->pos, *bufsz - decoder->pos);
+    *bufsz -= decoder->pos - data_offset;
+    decoder->pos = data_offset;
   }
   return ret;
 }
