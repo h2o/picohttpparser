@@ -25,25 +25,15 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "picotest/picotest.h"
 #include "picohttpparser.h"
 
-void tests(int num)
-{
-  printf("1..%d\n", num);
-}
-
-void ok(int ok, const char* msg)
-{
-  static int testnum = 0;
-  printf("%s %d - %s\n", ok ? "ok" : "not ok", ++testnum, msg);
-}
-
-int strrcmp(const char* s, size_t l, const char* t)
+static int strrcmp(const char* s, size_t l, const char* t)
 {
   return strlen(t) == l && memcmp(s, t, l) == 0;
 }
 
-int main(void)
+static void test_request(void)
 {
   const char* method;
   size_t method_len;
@@ -53,64 +43,60 @@ int main(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-  tests(56);
-  
 #define PARSE(s, last_len, exp, comment)                                \
+  note(comment); \
   num_headers = sizeof(headers) / sizeof(headers[0]);                        \
   ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path,        \
                        &path_len, &minor_version, headers,                \
                        &num_headers, last_len)                                \
-    == (exp == 0 ? strlen(s) : exp),                                        \
-    comment)
+    == (exp == 0 ? strlen(s) : exp));                                        \
   
   PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
-  ok(num_headers == 0, "# of headers");
-  ok(strrcmp(method, method_len, "GET"), "method");
-  ok(strrcmp(path, path_len, "/"), "path");
-  ok(minor_version == 0, "minor version");
+  ok(num_headers == 0);
+  ok(strrcmp(method, method_len, "GET"));
+  ok(strrcmp(path, path_len, "/"));
+  ok(minor_version == 0);
   
   PARSE("GET / HTTP/1.0\r\n\r", 0, -2, "partial");
   
   PARSE("GET /hoge HTTP/1.1\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
         "parse headers");
-  ok(num_headers == 2, "# of headers");
-  ok(strrcmp(method, method_len, "GET"), "method");
-  ok(strrcmp(path, path_len, "/hoge"), "path");
-  ok(minor_version == 1, "minor version");
-  ok(strrcmp(headers[0].name, headers[0].name_len, "Host"), "host");
-  ok(strrcmp(headers[0].value, headers[0].value_len, "example.com"),
-     "host value");
-  ok(strrcmp(headers[1].name, headers[1].name_len, "Cookie"), "cookie");
-  ok(strrcmp(headers[1].value, headers[1].value_len, ""), "cookie value");
+  ok(num_headers == 2);
+  ok(strrcmp(method, method_len, "GET"));
+  ok(strrcmp(path, path_len, "/hoge"));
+  ok(minor_version == 1);
+  ok(strrcmp(headers[0].name, headers[0].name_len, "Host"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, "example.com"));
+  ok(strrcmp(headers[1].name, headers[1].name_len, "Cookie"));
+  ok(strrcmp(headers[1].value, headers[1].value_len, ""));
   
   PARSE("GET / HTTP/1.0\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n", 0, 0,
         "parse multiline");
-  ok(num_headers == 3, "# of headers");
-  ok(strrcmp(method, method_len, "GET"), "method");
-  ok(strrcmp(path, path_len, "/"), "path");
-  ok(minor_version == 0, "minor version");
-  ok(strrcmp(headers[0].name, headers[0].name_len, "foo"), "header #1 name");
-  ok(strrcmp(headers[0].value, headers[0].value_len, ""), "header #1 value");
-  ok(strrcmp(headers[1].name, headers[1].name_len, "foo"), "header #2 name");
-  ok(strrcmp(headers[1].value, headers[1].value_len, "b"), "header #2 value");
-  ok(headers[2].name == NULL, "header #3");
-  ok(strrcmp(headers[2].value, headers[2].value_len, "  \tc"),
-     "header #3 value");
+  ok(num_headers == 3);
+  ok(strrcmp(method, method_len, "GET"));
+  ok(strrcmp(path, path_len, "/"));
+  ok(minor_version == 0);
+  ok(strrcmp(headers[0].name, headers[0].name_len, "foo"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, ""));
+  ok(strrcmp(headers[1].name, headers[1].name_len, "foo"));
+  ok(strrcmp(headers[1].value, headers[1].value_len, "b"));
+  ok(headers[2].name == NULL);
+  ok(strrcmp(headers[2].value, headers[2].value_len, "  \tc"));
   
   PARSE("GET", 0, -2, "incomplete 1");
-  ok(method == NULL, "method not ready");
+  ok(method == NULL);
   PARSE("GET ", 0, -2, "incomplete 2");
-  ok(strrcmp(method, method_len, "GET"), "method ready");
+  ok(strrcmp(method, method_len, "GET"));
   PARSE("GET /", 0, -2, "incomplete 3");
-  ok(path == NULL, "path not ready");
+  ok(path == NULL);
   PARSE("GET / ", 0, -2, "incomplete 4");
-  ok(strrcmp(path, path_len, "/"), "path ready");
+  ok(strrcmp(path, path_len, "/"));
   PARSE("GET / H", 0, -2, "incomplete 5");
   PARSE("GET / HTTP/1.", 0, -2, "incomplete 6");
   PARSE("GET / HTTP/1.0", 0, -2, "incomplete 7");
-  ok(minor_version == -1, "version not ready");
+  ok(minor_version == -1);
   PARSE("GET / HTTP/1.0\r", 0, -2, "incomplete 8");
-  ok(minor_version == 0, "version is ready");
+  ok(minor_version == 0);
   
   PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
         -2, "slowloris (incomplete)");
@@ -126,14 +112,114 @@ int main(void)
   PARSE("GET / HTTP/1.0\r\na\0b: c\r\n\r\n", 0, -1, "NUL in header name");
   PARSE("GET / HTTP/1.0\r\nab: c\0d\r\n\r\n", 0, -1, "NUL in header value");
   PARSE("GET /\xa0 HTTP/1.0\r\nh: c\xa2y\r\n\r\n", 0, 0, "accept MSB chars");
-  ok(num_headers == 1, "# of headers");
-  ok(strrcmp(method, method_len, "GET"), "method");
-  ok(strrcmp(path, path_len, "/\xa0"), "path");
-  ok(minor_version == 0, "minor version");
-  ok(strrcmp(headers[0].name, headers[0].name_len, "h"), "header #1 name");
-  ok(strrcmp(headers[0].value, headers[0].value_len, "c\xa2y"), "header #1 value");
+  ok(num_headers == 1);
+  ok(strrcmp(method, method_len, "GET"));
+  ok(strrcmp(path, path_len, "/\xa0"));
+  ok(minor_version == 0);
+  ok(strrcmp(headers[0].name, headers[0].name_len, "h"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, "c\xa2y"));
 
 #undef PARSE
+}
+
+static void test_response(void)
+{
+  int minor_version;
+  int status;
+  const char *msg;
+  size_t msg_len;
+  struct phr_header headers[4];
+  size_t num_headers;
   
-  return 0;
+#define PARSE(s, last_len, exp, comment)                                \
+  note(comment); \
+  num_headers = sizeof(headers) / sizeof(headers[0]);                        \
+  ok(phr_parse_response(s, strlen(s), &minor_version, &status,               \
+                       &msg, &msg_len, headers,                                \
+                       &num_headers, last_len)                                \
+    == (exp == 0 ? strlen(s) : exp));                                        \
+  
+  PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
+  ok(num_headers == 0);
+  ok(status      == 200);
+  ok(minor_version = 1);
+  ok(strrcmp(msg, msg_len, "OK"));
+  
+  PARSE("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial");
+
+  PARSE("HTTP/1.1 200 OK\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
+        "parse headers");
+  ok(num_headers == 2);
+  ok(minor_version == 1);
+  ok(status == 200);
+  ok(strrcmp(msg, msg_len, "OK"));
+  ok(strrcmp(headers[0].name, headers[0].name_len, "Host"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, "example.com"));
+  ok(strrcmp(headers[1].name, headers[1].name_len, "Cookie"));
+  ok(strrcmp(headers[1].value, headers[1].value_len, ""));
+
+  PARSE("HTTP/1.0 200 OK\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n", 0, 0,
+        "parse multiline");
+  ok(num_headers == 3);
+  ok(minor_version == 0);
+  ok(status == 200);
+  ok(strrcmp(msg, msg_len, "OK"));
+  ok(strrcmp(headers[0].name, headers[0].name_len, "foo"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, ""));
+  ok(strrcmp(headers[1].name, headers[1].name_len, "foo"));
+  ok(strrcmp(headers[1].value, headers[1].value_len, "b"));
+  ok(headers[2].name == NULL);
+  ok(strrcmp(headers[2].value, headers[2].value_len, "  \tc"));
+
+  PARSE("HTTP/1.0 500 Internal Server Error\r\n\r\n", 0, 0,
+        "internal server error");
+  ok(num_headers == 0);
+  ok(minor_version == 0);
+  ok(status == 500);
+  ok(strrcmp(msg, msg_len, "Internal Server Error"));
+  ok(msg_len == sizeof("Internal Server Error")-1);
+  
+  PARSE("H", 0, -2, "incomplete 1");
+  PARSE("HTTP/1.", 0, -2, "incomplete 2");
+  PARSE("HTTP/1.1", 0, -2, "incomplete 3");
+  ok(minor_version == -1);
+  PARSE("HTTP/1.1 ", 0, -2, "incomplete 4");
+  ok(minor_version == 1);
+  PARSE("HTTP/1.1 2", 0, -2, "incomplete 5");
+  PARSE("HTTP/1.1 200", 0, -2, "incomplete 6");
+  ok(status == 0);
+  PARSE("HTTP/1.1 200 ", 0, -2, "incomplete 7");
+  ok(status == 200);
+  PARSE("HTTP/1.1 200 O", 0, -2, "incomplete 8");
+  PARSE("HTTP/1.1 200 OK\r", 0, -2, "incomplete 9");
+  ok(msg == NULL);
+  PARSE("HTTP/1.1 200 OK\r\n", 0, -2, "incomplete 10");
+  ok(strrcmp(msg, msg_len, "OK"));
+  PARSE("HTTP/1.1 200 OK\n", 0, -2, "incomplete 11");
+  ok(strrcmp(msg, msg_len, "OK"));
+
+  PARSE("HTTP/1.1 200 OK\r\nA: 1\r", 0, -2, "incomplete 11");
+  ok(num_headers == 0);
+  PARSE("HTTP/1.1 200 OK\r\nA: 1\r\n", 0, -2, "incomplete 12");
+  ok(num_headers == 1);
+  ok(strrcmp(headers[0].name, headers[0].name_len, "A"));
+  ok(strrcmp(headers[0].value, headers[0].value_len, "1"));
+  
+  PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
+        -2, "slowloris (incomplete)");
+  PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
+        0, "slowloris (complete)");
+  
+  PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
+  PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
+  PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
+  
+#undef PARSE
+}
+
+int main(int argc, char **argv)
+{
+  subtest("request", test_request);
+  subtest("response", test_response);
+  return done_testing();
 }
