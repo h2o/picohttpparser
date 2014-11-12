@@ -54,12 +54,12 @@ int main(void)
   
   tests(61);
   
-#define PARSE(s, last_len, exp, comment)				\
-  num_headers = sizeof(headers) / sizeof(headers[0]);			\
-  ok(phr_parse_response(s, strlen(s), &minor_version, &status,       	\
-		       &msg, &msg_len, headers,		                \
-		       &num_headers, last_len)				\
-    == (exp == 0 ? strlen(s) : exp),					\
+#define PARSE(s, last_len, exp, comment)                                \
+  num_headers = sizeof(headers) / sizeof(headers[0]);                        \
+  ok(phr_parse_response(s, strlen(s), &minor_version, &status,               \
+                       &msg, &msg_len, headers,                                \
+                       &num_headers, last_len)                                \
+    == (exp == 0 ? strlen(s) : exp),                                        \
     comment)
   
   PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
@@ -71,7 +71,7 @@ int main(void)
   PARSE("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial");
 
   PARSE("HTTP/1.1 200 OK\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
-	"parse headers");
+        "parse headers");
   ok(num_headers == 2, "# of headers");
   ok(minor_version == 1, "minor_version");
   ok(status == 200, "status");
@@ -83,7 +83,7 @@ int main(void)
   ok(strrcmp(headers[1].value, headers[1].value_len, ""), "cookie value");
 
   PARSE("HTTP/1.0 200 OK\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n", 0, 0,
-	"parse multiline");
+        "parse multiline");
   ok(num_headers == 3, "# of headers");
   ok(minor_version == 0, "minor_version");
   ok(status == 200, "status");
@@ -97,7 +97,7 @@ int main(void)
      "header #3 value");
 
   PARSE("HTTP/1.0 500 Internal Server Error\r\n\r\n", 0, 0,
-	"internal server error");
+        "internal server error");
   ok(num_headers == 0, "# of headers");
   ok(minor_version == 0, "minor_version");
   ok(status == 500, "status");
@@ -131,9 +131,9 @@ int main(void)
   ok(strrcmp(headers[0].value, headers[0].value_len, "1"), "header #1 value");
   
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
-	-2, "slowloris (incomplete)");
+        -2, "slowloris (incomplete)");
   PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
-	0, "slowloris (complete)");
+        0, "slowloris (complete)");
   
   PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
   PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");

@@ -43,8 +43,8 @@ int main(void)
   for (i = 0; i < 1000000; i++) {
     num_headers = sizeof(headers) / sizeof(headers[0]);
     ret = phr_parse_request(REQ, sizeof(REQ) - 1, &method, &method_len, &path,
-			    &path_len, &minor_version, headers, &num_headers,
-			    0);
+                            &path_len, &minor_version, headers, &num_headers,
+                            0);
     assert(ret == sizeof(REQ) - 1);
   }
   

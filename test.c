@@ -55,12 +55,12 @@ int main(void)
   
   tests(56);
   
-#define PARSE(s, last_len, exp, comment)				\
-  num_headers = sizeof(headers) / sizeof(headers[0]);			\
-  ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path,	\
-		       &path_len, &minor_version, headers,		\
-		       &num_headers, last_len)				\
-    == (exp == 0 ? strlen(s) : exp),					\
+#define PARSE(s, last_len, exp, comment)                                \
+  num_headers = sizeof(headers) / sizeof(headers[0]);                        \
+  ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path,        \
+                       &path_len, &minor_version, headers,                \
+                       &num_headers, last_len)                                \
+    == (exp == 0 ? strlen(s) : exp),                                        \
     comment)
   
   PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
@@ -72,7 +72,7 @@ int main(void)
   PARSE("GET / HTTP/1.0\r\n\r", 0, -2, "partial");
   
   PARSE("GET /hoge HTTP/1.1\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
-	"parse headers");
+        "parse headers");
   ok(num_headers == 2, "# of headers");
   ok(strrcmp(method, method_len, "GET"), "method");
   ok(strrcmp(path, path_len, "/hoge"), "path");
@@ -84,7 +84,7 @@ int main(void)
   ok(strrcmp(headers[1].value, headers[1].value_len, ""), "cookie value");
   
   PARSE("GET / HTTP/1.0\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n", 0, 0,
-	"parse multiline");
+        "parse multiline");
   ok(num_headers == 3, "# of headers");
   ok(strrcmp(method, method_len, "GET"), "method");
   ok(strrcmp(path, path_len, "/"), "path");
@@ -113,9 +113,9 @@ int main(void)
   ok(minor_version == 0, "version is ready");
   
   PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
-	-2, "slowloris (incomplete)");
+        -2, "slowloris (incomplete)");
   PARSE("GET /hoge HTTP/1.0\r\n\r\n", strlen("GET /hoge HTTP/1.0\r\n\r\n") - 1,
-	0, "slowloris (complete)");
+        0, "slowloris (complete)");
   
   PARSE("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name");
   PARSE("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)");
