@@ -27,24 +27,9 @@ PROVE?=prove
 
 all:
 
-test: build_request build_response
-	$(PROVE) -e '/bin/sh -c' ./test_request
-	$(PROVE) -e '/bin/sh -c' ./test_response
-
-test_request: build_request
-	$(PROVE) -e '/bin/sh -c' ./test_request
-
-test_response: build_request
-	$(PROVE) -e '/bin/sh -c' ./test_response
-
-build_request: picohttpparser.c test.c
-	$(CC) -Wall $(LDFLAGS) -o test_request $^
-
-build_response: picohttpparser.c test_response.c
-	$(CC) -Wall $(LDFLAGS) -o test_response $^
+test: picohttpparser.c picotest/picotest.c test.c
+	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o test $^
+	$(PROVE) -v ./test
 
 clean:
-	rm -f test_request
-	rm -f test_response
-
-.PHONY: test
+	rm -f test
