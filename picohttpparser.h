@@ -64,8 +64,9 @@ int phr_parse_headers(const char* buf, size_t len, struct phr_header* headers,
 /* should be zero-filled before start */
 struct phr_chunked_decoder {
   size_t bytes_left_in_chunk; /* number of bytes left in current chunk */
-  int _hex_count;
-  int _state;
+  char consume_trailer; /* if trailing headers should be consumed */
+  char _hex_count;
+  char _state;
 };
 
 /* the function rewrites the buffer given as (buf, bufsz) removing the chunked-

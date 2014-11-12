@@ -400,7 +400,9 @@ int phr_parse_headers(const char* buf_start, size_t len,
 enum {
   CHUNKED_IN_CHUNK_SIZE,
   CHUNKED_IN_CHUNK_EXT,
-  CHUNKED_IN_CHUNK_DATA
+  CHUNKED_IN_CHUNK_DATA,
+  CHUNKED_IN_TRAILERS_LINE_HEAD,
+  CHUNKED_IN_TRAILERS_LINE_MIDDLE
 };
 
 static int decode_hex(int ch)
@@ -456,8 +458,12 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       }
       ++pos;
       if (decoder->bytes_left_in_chunk == 0) {
-        ret = *bufsz - pos;
-        goto Exit;
+        if (decoder->consume_trailer) {
+          decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
+          break;
+        } else {
+          goto Complete;
+        }
       }
       decoder->_state = CHUNKED_IN_CHUNK_DATA;
       /* fallthru */
@@ -478,11 +484,34 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
         decoder->_state = CHUNKED_IN_CHUNK_SIZE;
       }
       break;
+    case CHUNKED_IN_TRAILERS_LINE_HEAD:
+      for (; ; ++pos) {
+        if (pos == *bufsz)
+          goto Exit;
+        if (buf[pos] != '\015')
+          break;
+      }
+      if (buf[pos++] == '\012')
+        goto Complete;
+      decoder->_state = CHUNKED_IN_TRAILERS_LINE_MIDDLE;
+      /* fallthru */
+    case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
+      for (; ; ++pos) {
+        if (pos == *bufsz)
+          goto Exit;
+        if (buf[pos] == '\012')
+          break;
+      }
+      ++pos;
+      decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
+      break;
     default:
       assert(!"decoder is corrupt");
     }
   }
 
+Complete:
+  ret = *bufsz - pos;
 Exit:
   memmove(buf + data_offset, buf + pos, *bufsz - pos);
   *bufsz = data_offset;
