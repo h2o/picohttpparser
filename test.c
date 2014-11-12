@@ -44,12 +44,14 @@ static void test_request(void)
   size_t num_headers;
   
 #define PARSE(s, last_len, exp, comment)                                \
-  note(comment); \
-  num_headers = sizeof(headers) / sizeof(headers[0]);                        \
-  ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path,        \
-                       &path_len, &minor_version, headers,                \
-                       &num_headers, last_len)                                \
-    == (exp == 0 ? strlen(s) : exp));                                        \
+  do {                                                                  \
+    note(comment);                                                      \
+    num_headers = sizeof(headers) / sizeof(headers[0]);                 \
+    ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path, \
+                         &path_len, &minor_version, headers,            \
+                         &num_headers, last_len)                        \
+       == (exp == 0 ? strlen(s) : exp));                                \
+  } while (0)
   
   PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
   ok(num_headers == 0);
@@ -131,13 +133,15 @@ static void test_response(void)
   struct phr_header headers[4];
   size_t num_headers;
   
-#define PARSE(s, last_len, exp, comment)                                \
-  note(comment); \
-  num_headers = sizeof(headers) / sizeof(headers[0]);                        \
-  ok(phr_parse_response(s, strlen(s), &minor_version, &status,               \
-                       &msg, &msg_len, headers,                                \
-                       &num_headers, last_len)                                \
-    == (exp == 0 ? strlen(s) : exp));                                        \
+#define PARSE(s, last_len, exp, comment)                         \
+  do {                                                           \
+    note(comment);                                               \
+    num_headers = sizeof(headers) / sizeof(headers[0]);          \
+    ok(phr_parse_response(s, strlen(s), &minor_version, &status, \
+                         &msg, &msg_len, headers,                \
+                         &num_headers, last_len)                 \
+       == (exp == 0 ? strlen(s) : exp));                         \
+  } while (0)
   
   PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
   ok(num_headers == 0);
