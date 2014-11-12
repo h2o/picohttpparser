@@ -26,6 +26,8 @@
 #ifndef picohttpparser_h
 #define picohttpparser_h
 
+#include <sys/types.h>
+
 /* $Id$ */
 
 #ifdef __cplusplus
@@ -66,15 +68,17 @@ struct phr_chunked_decoder {
   int _state;
 };
 
-/* decodes chunked-encoded content. Applications should repeatedly call the
- * function while it returns -2 (incomplete).  The function rewrites the buffer
- * given as (buf, bufsz) removing the chunked-encoding headers.  The number of
- * bytes available as data is returned as `num_bytes_ready`, which would be
- * equal to the returned `bufsz` in case the function returns -2.  Returns -1
- * on error, 0 when end-of-stream was found within the supplied input.
+/* the function rewrites the buffer given as (buf, bufsz) removing the chunked-
+ * encoding headers.  When the function successfully returns, bufsz is updated
+ * to the length of the decoded data available.  Applications should repeatedly
+ * call the function while it returns -2 (incomplete) every time supplying newly
+ * arrived data.  Returns -1 on error, a non-negative number when end-of-stream
+ * was found within the supplied input.  In such case, the returned number
+ * indicates the number of octets left undecoded in the trailing area of the
+ * buffer.
  */
-int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
-                       size_t *bufsz, size_t *num_bytes_ready);
+ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                           size_t *bufsz);
 
 #ifdef __cplusplus
 }

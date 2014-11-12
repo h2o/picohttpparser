@@ -416,11 +416,11 @@ static int decode_hex(int ch)
   }
 }
 
-int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
-                       size_t *bufsz, size_t *num_bytes_ready)
+ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                           size_t *bufsz)
 {
   size_t data_offset = 0, pos = 0;
-  int ret = -2; /* incomplete */
+  ssize_t ret = -2; /* incomplete */
 
   while (1) {
     switch (decoder->_state) {
@@ -456,7 +456,7 @@ int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       }
       ++pos;
       if (decoder->bytes_left_in_chunk == 0) {
-        ret = 0;
+        ret = *bufsz - pos;
         goto Exit;
       }
       decoder->_state = CHUNKED_IN_CHUNK_DATA;
@@ -485,8 +485,7 @@ int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
 
 Exit:
   memmove(buf + data_offset, buf + pos, *bufsz - pos);
-  *bufsz -= pos - data_offset;
-  *num_bytes_ready = data_offset;
+  *bufsz = data_offset;
   return ret;
 }
 
