@@ -27,9 +27,13 @@ PROVE?=prove
 
 all:
 
-test: picohttpparser.c picotest/picotest.c test.c
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o test $^
-	$(PROVE) -v ./test
+test: test-bin
+	$(PROVE) -v ./test-bin
+
+test-bin: picohttpparser.c picotest/picotest.c test.c
+	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	rm -f test
+	rm -f test-bin
+
+.PHONY: test
