@@ -1,6 +1,8 @@
 PicoHTTPParser
 =============
 
+Copyright (c) 2009-2014 [Kazuho Oku](https://github.com/kazuho), [Tokuhiro Matsuno](https://github.com/tokuhirom), [Daisuke Murase](https://github.com/typester)
+
 PicoHTTPParser is a tiny, primitive, fast HTTP request/response parser.
 
 Unlike most parsers, it is stateless and does not allocate memory by itself.
