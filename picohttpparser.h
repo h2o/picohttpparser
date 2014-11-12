@@ -28,8 +28,6 @@
 
 /* $Id$ */
 
-#include <sys/types.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,18 +61,20 @@ int phr_parse_headers(const char* buf, size_t len, struct phr_header* headers,
 
 /* should be zero-filled before start */
 struct phr_chunked_decoder {
-  size_t pos;
-  size_t chunk_data_size;
-  int state;
+  size_t bytes_left_in_chunk; /* number of bytes left in current chunk */
+  int _hex_count;
+  int _state;
 };
 
-/* removes the headers of the chunked encoding from the buffer.  Users should
- * repeatedly call this function while it returns -2 with newly arrived data
- * appended to the end of the buffer.  Upon success, the function returns the
- * length of the decoded content (which starts at `buf`), or returns -1 if
- * failed. */
-ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
-                           size_t *bufsz);
+/* decodes chunked-encoded content. Applications should repeatedly call the
+ * function while it returns -2 (incomplete).  The function rewrites the buffer
+ * given as (buf, bufsz) removing the chunked-encoding headers.  The number of
+ * bytes available as data is returned as `num_bytes_ready`, which would be
+ * equal to the returned `bufsz` in case the function returns -2.  Returns -1
+ * on error, 0 when end-of-stream was found within the supplied input.
+ */
+int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                       size_t *bufsz, size_t *num_bytes_ready);
 
 #ifdef __cplusplus
 }

@@ -265,20 +265,21 @@ static void test_chunked_at_once(int line, const char *encoded,
 {
   struct phr_chunked_decoder dec = {};
   char *buf;
-  size_t bufsz;
-  ssize_t ret;
+  size_t bufsz, bytes_ready;
+  int ret;
 
   note("testing at-once, source at line %d", line);
 
   buf = strdup(encoded);
   bufsz = strlen(buf);
 
-  ret = phr_decode_chunked(&dec, buf, &bufsz);
+  ret = phr_decode_chunked(&dec, buf, &bufsz, &bytes_ready);
 
-  ok(ret == strlen(decoded));
-  ok(bufsz == ret + extra);
-  ok(bufis(buf, ret, decoded));
-  ok(bufis(buf + ret, extra, encoded + strlen(encoded) - extra));
+  ok(ret == 0);
+  ok(bytes_ready == strlen(decoded));
+  ok(bufsz == bytes_ready + extra);
+  ok(bufis(buf, bytes_ready, decoded));
+  ok(bufis(buf + bytes_ready, extra, encoded + strlen(encoded) - extra));
 
   free(buf);
 }
@@ -288,50 +289,58 @@ static void test_chunked_per_byte(int line, const char *encoded,
 {
   struct phr_chunked_decoder dec = {};
   char *buf = malloc(strlen(encoded));
-  size_t bytes_to_consume = strlen(encoded) - extra, bufsz = 0, i;
-  ssize_t ret;
+  size_t bytes_to_consume = strlen(encoded) - extra, bytes_ready = 0, bufsz, t, i;
+  int ret;
 
   note("testing per-byte, source at line %d", line);
 
   for (i = 0; i < bytes_to_consume - 1; ++i) {
-    buf[bufsz++] = encoded[i];
-    ret = phr_decode_chunked(&dec, buf, &bufsz);
+    buf[bytes_ready] = encoded[i];
+    bufsz = 1;
+    ret = phr_decode_chunked(&dec, buf + bytes_ready, &bufsz, &t);
     if (ret != -2) {
       ok(0);
       return;
     }
+    if (bufsz != t) {
+      ok(0);
+      return;
+    }
+    bytes_ready += t;
   }
-  memcpy(buf + bufsz, encoded + bytes_to_consume - 1, extra + 1);
-  bufsz += extra + 1;
-  ret = phr_decode_chunked(&dec, buf, &bufsz);
-  ok(ret == strlen(decoded));
-  ok(bufsz == ret + extra);
-  ok(bufis(buf, ret, decoded));
-  ok(bufis(buf + ret, extra, encoded + bytes_to_consume));
+  memcpy(buf + bytes_ready, encoded + bytes_to_consume - 1, extra + 1);
+  bufsz = extra + 1;
+  ret = phr_decode_chunked(&dec, buf + bytes_ready, &bufsz, &t);
+  ok(ret == 0);
+  bytes_ready += t;
+  ok(bytes_ready == strlen(decoded));
+  ok(bufsz - t == extra);
+  ok(bufis(buf, bytes_ready, decoded));
+  ok(bufis(buf + bytes_ready, extra, encoded + bytes_to_consume));
 
   free(buf);
 }
 
-static void test_chunked_failure(int line, const char *encoded)
+static void test_chunked_failure(int line, const char *encoded, ssize_t expected)
 {
   struct phr_chunked_decoder dec = {};
   char *buf = strdup(encoded);
-  size_t bufsz, i;
-  ssize_t ret;
+  size_t bufsz, t, i;
+  int ret;
 
   note("testing failure at-once, source at line %d", line);
   bufsz = strlen(buf);
-  ret = phr_decode_chunked(&dec, buf, &bufsz);
-  ok(ret == -1);
+  ret = phr_decode_chunked(&dec, buf, &bufsz, &t);
+  ok(ret == expected);
 
   note("testing failure per-byte, source at line %d", line);
   memset(&dec, 0, sizeof(dec));
-  bufsz = 0;
   for (i = 0; encoded[i] != '\0'; ++i) {
-    buf[bufsz++] = encoded[i];
-    ret = phr_decode_chunked(&dec, buf, &bufsz);
+    buf[0] = encoded[i];
+    bufsz = 1;
+    ret = phr_decode_chunked(&dec, buf, &bufsz, &t);
     if (ret == -1) {
-      ok(1);
+      ok(ret == expected);
       return;
     } else if (ret == -2) {
       /* continue */
@@ -340,7 +349,9 @@ static void test_chunked_failure(int line, const char *encoded)
       return;
     }
   }
-  ok(0);
+  ok(ret == expected);
+
+  free(buf);
 }
 
 static void test_chunked(void)
@@ -365,8 +376,11 @@ static void test_chunked(void)
   }
 
   note("failures");
-  test_chunked_failure(__LINE__, "z\r\nabcdefg");
-  test_chunked_failure(__LINE__, "6\r\nhello fffffffff\r\nabcdefg");
+  test_chunked_failure(__LINE__, "z\r\nabcdefg", -1);
+  if (sizeof(size_t) == 8) {
+    test_chunked_failure(__LINE__, "6\r\nhello ffffffffffffffff\r\nabcdefg", -2);
+    test_chunked_failure(__LINE__, "6\r\nhello fffffffffffffffff\r\nabcdefg", -1);
+  }
 }
 
 int main(int argc, char **argv)

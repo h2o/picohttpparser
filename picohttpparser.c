@@ -403,82 +403,90 @@ enum {
   CHUNKED_IN_CHUNK_DATA
 };
 
-static ssize_t decode_hexnum(const char *bytes, size_t len, size_t *value)
+static int decode_hex(int ch)
 {
-  size_t v = 0, i;
-  int ch;
-
-  for (i = 0; i != len; ++i) {
-    if (i >= sizeof(size_t) / 4)
-      return -1;
-    ch = bytes[i];
-    if ('0' <= ch && ch <= '9') {
-      v = v * 16 + ch - '0';
-    } else if ('A' <= ch && ch <= 'F') {
-      v = v * 16 + ch - 'A' + 0xa;
-    } else if ('a' <= ch && ch <= 'f') {
-      v = v * 16 + ch - 'a' + 0xa;
-    } else {
-      if (i == 0)
-        return -1;
-      *value = v;
-      return i;
-    }
+  if ('0' <= ch && ch <= '9') {
+    return ch - '0';
+  } else if ('A' <= ch && ch <= 'F') {
+    return ch - 'A' + 0xa;
+  } else if ('a' <= ch && ch <= 'f') {
+    return ch - 'a' + 0xa;
+  } else {
+    return -1;
   }
-  return -2;
 }
 
-ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
-                           size_t *bufsz)
+int phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                       size_t *bufsz, size_t *num_bytes_ready)
 {
-  size_t data_offset = decoder->pos;
-  ssize_t ret = -2; /* incomplete */
+  size_t data_offset = 0, pos = 0;
+  int ret = -2; /* incomplete */
 
   while (1) {
-    switch (decoder->state) {
+    switch (decoder->_state) {
     case CHUNKED_IN_CHUNK_SIZE:
-      if ((ret = decode_hexnum(buf + decoder->pos, *bufsz - decoder->pos,
-                               &decoder->chunk_data_size))
-          < 0)
-        goto Exit;
-      decoder->pos += ret;
-      ret = -2; /* reset to incomplete */
-      decoder->state = CHUNKED_IN_CHUNK_EXT;
+      for (; ; ++pos) {
+        int v;
+        if (pos == *bufsz)
+          goto Exit;
+        if ((v = decode_hex(buf[pos])) == -1) {
+          if (decoder->_hex_count == 0) {
+            ret = -1;
+            goto Exit;
+          }
+          break;
+        }
+        if (decoder->_hex_count == sizeof(size_t) * 2) {
+          ret = -1;
+          goto Exit;
+        }
+        decoder->bytes_left_in_chunk = decoder->bytes_left_in_chunk * 16 + v;
+        ++decoder->_hex_count;
+      }
+      decoder->_hex_count = 0;
+      decoder->_state = CHUNKED_IN_CHUNK_EXT;
       /* fallthru */
     case CHUNKED_IN_CHUNK_EXT:
       /* RFC 7230 A.2 "Line folding in chunk extensions is disallowed" */
-      for (; ; ++decoder->pos) {
-        if (*bufsz - decoder->pos < 2)
-            goto Exit;
-        if (memcmp(buf + decoder->pos, "\r\n", 2) == 0)
-            break;
+      for (; ; ++pos) {
+        if (pos == *bufsz)
+          goto Exit;
+        if (buf[pos] == '\012')
+          break;
       }
-      decoder->pos += 2;
-      if (decoder->chunk_data_size == 0) {
-        ret = data_offset;
+      ++pos;
+      if (decoder->bytes_left_in_chunk == 0) {
+        ret = 0;
         goto Exit;
       }
-      decoder->state = CHUNKED_IN_CHUNK_DATA;
+      decoder->_state = CHUNKED_IN_CHUNK_DATA;
       /* fallthru */
     case CHUNKED_IN_CHUNK_DATA:
-      if (*bufsz - decoder->pos < decoder->chunk_data_size)
-        goto Exit;
-      memmove(buf + data_offset, buf + decoder->pos, decoder->chunk_data_size);
-      decoder->pos += decoder->chunk_data_size;
-      data_offset += decoder->chunk_data_size;
-      decoder->state = CHUNKED_IN_CHUNK_SIZE;
+      {
+        size_t avail = *bufsz - pos;
+        if (avail < decoder->bytes_left_in_chunk) {
+          memmove(buf + data_offset, buf + pos, avail);
+          pos += avail;
+          data_offset += avail;
+          decoder->bytes_left_in_chunk -= avail;
+          goto Exit;
+        }
+        memmove(buf + data_offset, buf + pos, decoder->bytes_left_in_chunk);
+        pos += decoder->bytes_left_in_chunk;
+        data_offset += decoder->bytes_left_in_chunk;
+        decoder->bytes_left_in_chunk = 0;
+        decoder->_state = CHUNKED_IN_CHUNK_SIZE;
+      }
       break;
     default:
       assert(!"decoder is corrupt");
     }
   }
 
-  Exit:
-  if (data_offset != decoder->pos) {
-    memmove(buf + data_offset, buf + decoder->pos, *bufsz - decoder->pos);
-    *bufsz -= decoder->pos - data_offset;
-    decoder->pos = data_offset;
-  }
+Exit:
+  memmove(buf + data_offset, buf + pos, *bufsz - pos);
+  *bufsz -= pos - data_offset;
+  *num_bytes_ready = data_offset;
   return ret;
 }
 
