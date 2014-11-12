@@ -421,17 +421,17 @@ static int decode_hex(int ch)
 ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
                            size_t *bufsz)
 {
-  size_t data_offset = 0, pos = 0;
+  size_t dst = 0, src = 0;
   ssize_t ret = -2; /* incomplete */
 
   while (1) {
     switch (decoder->_state) {
     case CHUNKED_IN_CHUNK_SIZE:
-      for (; ; ++pos) {
+      for (; ; ++src) {
         int v;
-        if (pos == *bufsz)
+        if (src == *bufsz)
           goto Exit;
-        if ((v = decode_hex(buf[pos])) == -1) {
+        if ((v = decode_hex(buf[src])) == -1) {
           if (decoder->_hex_count == 0) {
             ret = -1;
             goto Exit;
@@ -450,13 +450,13 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       /* fallthru */
     case CHUNKED_IN_CHUNK_EXT:
       /* RFC 7230 A.2 "Line folding in chunk extensions is disallowed" */
-      for (; ; ++pos) {
-        if (pos == *bufsz)
+      for (; ; ++src) {
+        if (src == *bufsz)
           goto Exit;
-        if (buf[pos] == '\012')
+        if (buf[src] == '\012')
           break;
       }
-      ++pos;
+      ++src;
       if (decoder->bytes_left_in_chunk == 0) {
         if (decoder->consume_trailer) {
           decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
@@ -469,40 +469,40 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       /* fallthru */
     case CHUNKED_IN_CHUNK_DATA:
       {
-        size_t avail = *bufsz - pos;
+        size_t avail = *bufsz - src;
         if (avail < decoder->bytes_left_in_chunk) {
-          memmove(buf + data_offset, buf + pos, avail);
-          pos += avail;
-          data_offset += avail;
+          memmove(buf + dst, buf + src, avail);
+          src += avail;
+          dst += avail;
           decoder->bytes_left_in_chunk -= avail;
           goto Exit;
         }
-        memmove(buf + data_offset, buf + pos, decoder->bytes_left_in_chunk);
-        pos += decoder->bytes_left_in_chunk;
-        data_offset += decoder->bytes_left_in_chunk;
+        memmove(buf + dst, buf + src, decoder->bytes_left_in_chunk);
+        src += decoder->bytes_left_in_chunk;
+        dst += decoder->bytes_left_in_chunk;
         decoder->bytes_left_in_chunk = 0;
         decoder->_state = CHUNKED_IN_CHUNK_SIZE;
       }
       break;
     case CHUNKED_IN_TRAILERS_LINE_HEAD:
-      for (; ; ++pos) {
-        if (pos == *bufsz)
+      for (; ; ++src) {
+        if (src == *bufsz)
           goto Exit;
-        if (buf[pos] != '\015')
+        if (buf[src] != '\015')
           break;
       }
-      if (buf[pos++] == '\012')
+      if (buf[src++] == '\012')
         goto Complete;
       decoder->_state = CHUNKED_IN_TRAILERS_LINE_MIDDLE;
       /* fallthru */
     case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
-      for (; ; ++pos) {
-        if (pos == *bufsz)
+      for (; ; ++src) {
+        if (src == *bufsz)
           goto Exit;
-        if (buf[pos] == '\012')
+        if (buf[src] == '\012')
           break;
       }
-      ++pos;
+      ++src;
       decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
       break;
     default:
@@ -511,10 +511,10 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
   }
 
 Complete:
-  ret = *bufsz - pos;
+  ret = *bufsz - src;
 Exit:
-  memmove(buf + data_offset, buf + pos, *bufsz - pos);
-  *bufsz = data_offset;
+  memmove(buf + dst, buf + src, *bufsz - src);
+  *bufsz = dst;
   return ret;
 }
 
