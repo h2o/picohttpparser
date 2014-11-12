@@ -419,9 +419,9 @@ static int decode_hex(int ch)
 }
 
 ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
-                           size_t *bufsz)
+                           size_t *_bufsz)
 {
-  size_t dst = 0, src = 0;
+  size_t dst = 0, src = 0, bufsz = *_bufsz;
   ssize_t ret = -2; /* incomplete */
 
   while (1) {
@@ -429,7 +429,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
     case CHUNKED_IN_CHUNK_SIZE:
       for (; ; ++src) {
         int v;
-        if (src == *bufsz)
+        if (src == bufsz)
           goto Exit;
         if ((v = decode_hex(buf[src])) == -1) {
           if (decoder->_hex_count == 0) {
@@ -451,7 +451,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
     case CHUNKED_IN_CHUNK_EXT:
       /* RFC 7230 A.2 "Line folding in chunk extensions is disallowed" */
       for (; ; ++src) {
-        if (src == *bufsz)
+        if (src == bufsz)
           goto Exit;
         if (buf[src] == '\012')
           break;
@@ -469,7 +469,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       /* fallthru */
     case CHUNKED_IN_CHUNK_DATA:
       {
-        size_t avail = *bufsz - src;
+        size_t avail = bufsz - src;
         if (avail < decoder->bytes_left_in_chunk) {
           memmove(buf + dst, buf + src, avail);
           src += avail;
@@ -486,7 +486,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       break;
     case CHUNKED_IN_TRAILERS_LINE_HEAD:
       for (; ; ++src) {
-        if (src == *bufsz)
+        if (src == bufsz)
           goto Exit;
         if (buf[src] != '\015')
           break;
@@ -497,7 +497,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       /* fallthru */
     case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
       for (; ; ++src) {
-        if (src == *bufsz)
+        if (src == bufsz)
           goto Exit;
         if (buf[src] == '\012')
           break;
@@ -511,10 +511,10 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
   }
 
 Complete:
-  ret = *bufsz - src;
+  ret = bufsz - src;
 Exit:
-  memmove(buf + dst, buf + src, *bufsz - src);
-  *bufsz = dst;
+  memmove(buf + dst, buf + src, bufsz - src);
+  *_bufsz = dst;
   return ret;
 }
 
