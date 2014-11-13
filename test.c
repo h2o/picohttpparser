@@ -377,24 +377,24 @@ static void test_chunked(void)
   size_t i;
 
   for (i = 0; chunked_test_runners[i] != NULL; ++i) {
-    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world0\r\n", "hello world",
+    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world",
                             0);
-    chunked_test_runners[i](__LINE__, 0, "6\r\nhello 5\r\nworld0\r\n",
+    chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\n",
                             "hello world", 0);
-    chunked_test_runners[i](__LINE__, 0, "6;comment=hi\r\nhello 5\r\nworld0\r\n",
+    chunked_test_runners[i](__LINE__, 0, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n",
                             "hello world", 0);
     chunked_test_runners[i](__LINE__, 0,
-                            "6\r\nhello 5\r\nworld0\r\na: b\r\nc: d\r\n\r\n",
+                            "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
                             "hello world", sizeof("a: b\r\nc: d\r\n\r\n") - 1);
-    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world0\r\n", "hello world",
+    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world",
                             0);
   }
 
   note("failures");
   test_chunked_failure(__LINE__, "z\r\nabcdefg", -1);
   if (sizeof(size_t) == 8) {
-    test_chunked_failure(__LINE__, "6\r\nhello ffffffffffffffff\r\nabcdefg", -2);
-    test_chunked_failure(__LINE__, "6\r\nhello fffffffffffffffff\r\nabcdefg", -1);
+    test_chunked_failure(__LINE__, "6\r\nhello \r\nffffffffffffffff\r\nabcdefg", -2);
+    test_chunked_failure(__LINE__, "6\r\nhello \r\nfffffffffffffffff\r\nabcdefg", -1);
   }
 }
 
@@ -403,18 +403,18 @@ static void test_chunked_consume_trailer(void)
   size_t i;
 
   for (i = 0; chunked_test_runners[i] != NULL; ++i) {
-    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world0\r\n", "hello world",
+    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world\r\n0\r\n", "hello world",
                             -2);
-    chunked_test_runners[i](__LINE__, 1, "6\r\nhello 5\r\nworld0\r\n",
+    chunked_test_runners[i](__LINE__, 1, "6\r\nhello \r\n5\r\nworld\r\n0\r\n",
                             "hello world", -2);
-    chunked_test_runners[i](__LINE__, 1, "6;comment=hi\r\nhello 5\r\nworld0\r\n",
+    chunked_test_runners[i](__LINE__, 1, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n",
                             "hello world", -2);
-    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world0\r\n\r\n",
+    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world\r\n0\r\n\r\n",
                             "hello world", 0);
-    chunked_test_runners[i](__LINE__, 1, "b\nhello world0\n\n",
+    chunked_test_runners[i](__LINE__, 1, "b\nhello world\n0\n\n",
                             "hello world", 0);
     chunked_test_runners[i](__LINE__, 1,
-                            "6\r\nhello 5\r\nworld0\r\na: b\r\nc: d\r\n\r\n",
+                            "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
                             "hello world", 0);
   }
 }

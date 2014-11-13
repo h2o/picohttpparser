@@ -401,6 +401,7 @@ enum {
   CHUNKED_IN_CHUNK_SIZE,
   CHUNKED_IN_CHUNK_EXT,
   CHUNKED_IN_CHUNK_DATA,
+  CHUNKED_IN_CHUNK_CRLF,
   CHUNKED_IN_TRAILERS_LINE_HEAD,
   CHUNKED_IN_TRAILERS_LINE_MIDDLE
 };
@@ -481,8 +482,22 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
         src += decoder->bytes_left_in_chunk;
         dst += decoder->bytes_left_in_chunk;
         decoder->bytes_left_in_chunk = 0;
-        decoder->_state = CHUNKED_IN_CHUNK_SIZE;
+        decoder->_state = CHUNKED_IN_CHUNK_CRLF;
       }
+      /* fallthru */
+    case CHUNKED_IN_CHUNK_CRLF:
+      for (; ; ++src) {
+        if (src == bufsz)
+          goto Exit;
+        if (buf[src] != '\015')
+          break;
+      }
+      if (buf[src] != '\012') {
+        ret = -1;
+        goto Exit;
+      }
+      ++src;
+      decoder->_state = CHUNKED_IN_CHUNK_SIZE;
       break;
     case CHUNKED_IN_TRAILERS_LINE_HEAD:
       for (; ; ++src) {
