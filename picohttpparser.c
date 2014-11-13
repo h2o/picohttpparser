@@ -472,13 +472,15 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
       {
         size_t avail = bufsz - src;
         if (avail < decoder->bytes_left_in_chunk) {
-          memmove(buf + dst, buf + src, avail);
+          if (dst != src)
+            memmove(buf + dst, buf + src, avail);
           src += avail;
           dst += avail;
           decoder->bytes_left_in_chunk -= avail;
           goto Exit;
         }
-        memmove(buf + dst, buf + src, decoder->bytes_left_in_chunk);
+        if (dst != src)
+          memmove(buf + dst, buf + src, decoder->bytes_left_in_chunk);
         src += decoder->bytes_left_in_chunk;
         dst += decoder->bytes_left_in_chunk;
         decoder->bytes_left_in_chunk = 0;
@@ -528,7 +530,8 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
 Complete:
   ret = bufsz - src;
 Exit:
-  memmove(buf + dst, buf + src, bufsz - src);
+  if (dst != src)
+    memmove(buf + dst, buf + src, bufsz - src);
   *_bufsz = dst;
   return ret;
 }
