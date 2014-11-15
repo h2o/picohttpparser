@@ -95,9 +95,11 @@ static inline const char* get_token_to_eol(const char* buf, const char* buf_end,
   /* find non-printable char within the next 16 bytes, this is the hottest code; manually inlined */
   while (likely(buf_end - buf >= 16)) {
     int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, *(const __m128i*)buf, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
-    buf += r;
-    if (unlikely(r != 16))
-        goto FOUND_CTL;
+    if (unlikely(r != 16)) {
+      buf += r;
+      goto FOUND_CTL;
+    }
+    buf += 16;
   }
   for (; ; ++buf) {
     CHECK_EOF();
