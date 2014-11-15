@@ -24,6 +24,7 @@
  */
 
 #include <stddef.h>
+#include <sys/types.h>
 #include <x86intrin.h>
 #include "picohttpparser.h"
 
@@ -93,13 +94,15 @@ static inline const char* get_token_to_eol(const char* buf, const char* buf_end,
   const char* token_start = buf;
 
   /* find non-printable char within the next 16 bytes, this is the hottest code; manually inlined */
-  while (likely(buf_end - buf >= 16)) {
+  ssize_t left_m16 = buf_end - buf - 16;
+  while (likely(left_m16 >= 0)) {
     int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, *(const __m128i*)buf, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
     if (unlikely(r != 16)) {
       buf += r;
       goto FOUND_CTL;
     }
     buf += 16;
+    left_m16 -= 16;
   }
   for (; ; ++buf) {
     CHECK_EOF();
