@@ -73,7 +73,18 @@ static void test_request(void)
   ok(bufis(headers[0].value, headers[0].value_len, "example.com"));
   ok(bufis(headers[1].name, headers[1].name_len, "Cookie"));
   ok(bufis(headers[1].value, headers[1].value_len, ""));
-  
+
+  PARSE("GET /hoge HTTP/1.1\r\nHost: example.com\r\nUser-Agent: \343\201\262\343/1.0\r\n\r\n", 0, 0,
+        "multibyte included");
+  ok(num_headers == 2);
+  ok(bufis(method, method_len, "GET"));
+  ok(bufis(path, path_len, "/hoge"));
+  ok(minor_version == 1);
+  ok(bufis(headers[0].name, headers[0].name_len, "Host"));
+  ok(bufis(headers[0].value, headers[0].value_len, "example.com"));
+  ok(bufis(headers[1].name, headers[1].name_len, "User-Agent"));
+  ok(bufis(headers[1].value, headers[1].value_len, "\343\201\262\343/1.0"));
+
   PARSE("GET / HTTP/1.0\r\nfoo: \r\nfoo: b\r\n  \tc\r\n\r\n", 0, 0,
         "parse multiline");
   ok(num_headers == 3);

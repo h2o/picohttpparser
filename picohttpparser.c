@@ -97,6 +97,7 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
     if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
       goto FOUND_CTL;
     }
+    ++buf;
   }
   for (; ; ++buf) {
     CHECK_EOF();
