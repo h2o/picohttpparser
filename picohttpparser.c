@@ -97,7 +97,7 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
         "\200\377" /* allow chars with MSB set */
         ;
     __m128i ranges16 = _mm_load_si128((const __m128i*)ranges);
-    ssize_t left_m16 = buf_end - buf - 16;
+    size_t left = (buf_end - buf) & ~15;
     do {
       __m128i b16 = _mm_loadu_si128((void*)buf);
       int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
@@ -106,8 +106,8 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
         goto FOUND_CTL;
       }
       buf += 16;
-      left_m16 -= 16;
-    } while (likely(left_m16 >= 0));
+      left -= 16;
+    } while (likely(left != 0));
 #else
     do {
 #define DOIT() if (unlikely(! IS_PRINTABLE_ASCII(*buf))) goto NonPrintable; ++buf
