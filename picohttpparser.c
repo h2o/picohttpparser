@@ -84,25 +84,27 @@ static inline const char* get_token_to_eol(const char* buf, const char* buf_end,
                                     const char** token, size_t* token_len,
                                     int* ret)
 {
-  static const char ranges[] __attribute__((aligned(16))) =
-      "\011\011" /* allow HT */
-      "\040\176" /* allow printable ascii */
-      "\200\377" /* allow chars with MSB set */
-      ;
-  __m128i ranges16 = _mm_load_si128((const __m128i*)ranges);
-
   const char* token_start = buf;
 
   /* find non-printable char within the next 16 bytes, this is the hottest code; manually inlined */
-  ssize_t left_m16 = buf_end - buf - 16;
-  while (likely(left_m16 >= 0)) {
-    int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, *(const __m128i*)buf, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
-    if (unlikely(r != 16)) {
-      buf += r;
-      goto FOUND_CTL;
-    }
-    buf += 16;
-    left_m16 -= 16;
+  if (likely(buf_end - buf >= 16)) {
+    static const char ranges[] __attribute__((aligned(16))) =
+        "\011\011" /* allow HT */
+        "\040\176" /* allow printable ascii */
+        "\200\377" /* allow chars with MSB set */
+        ;
+    __m128i ranges16 = _mm_load_si128((const __m128i*)ranges);
+    ssize_t left_m16 = buf_end - buf - 16;
+    do {
+      __m128i b16 = _mm_loadu_si128((void*)buf);
+      int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+      if (unlikely(r != 16)) {
+        buf += r;
+        goto FOUND_CTL;
+      }
+      buf += 16;
+      left_m16 -= 16;
+    } while (likely(left_m16 >= 10));
   }
   for (; ; ++buf) {
     CHECK_EOF();
