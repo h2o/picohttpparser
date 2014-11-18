@@ -24,6 +24,10 @@
  */
 
 #include <stddef.h>
+#include <sys/types.h>
+#ifdef __SSE4_2__
+# include <x86intrin.h>
+#endif
 #include "picohttpparser.h"
 
 /* $Id$ */
@@ -84,18 +88,40 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
 {
   const char* token_start = buf;
   
-  /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
-  while (likely(buf_end - buf >= 8)) {
+  /* find non-printable char within the next 16 bytes, this is the hottest code; manually inlined */
+  if (likely(buf_end - buf >= 16)) {
+#if __SSE4_2__
+    static const char ranges[] __attribute__((aligned(16))) =
+        "\011\011" /* allow HT */
+        "\040\176" /* allow printable ascii */
+        "\200\377" /* allow chars with MSB set */
+        ;
+    __m128i ranges16 = _mm_load_si128((const __m128i*)ranges);
+    ssize_t left_m16 = buf_end - buf - 16;
+    do {
+      __m128i b16 = _mm_loadu_si128((void*)buf);
+      int r = _mm_cmpestri(ranges16, sizeof(ranges) - 1, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_NEGATIVE_POLARITY | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+      if (unlikely(r != 16)) {
+        buf += r;
+        goto FOUND_CTL;
+      }
+      buf += 16;
+      left_m16 -= 16;
+    } while (likely(left_m16 >= 0));
+#else
+    do {
 #define DOIT() if (unlikely(! IS_PRINTABLE_ASCII(*buf))) goto NonPrintable; ++buf
-    DOIT(); DOIT(); DOIT(); DOIT();
-    DOIT(); DOIT(); DOIT(); DOIT();
+      DOIT(); DOIT(); DOIT(); DOIT();
+      DOIT(); DOIT(); DOIT(); DOIT();
 #undef DOIT
-    continue;
-  NonPrintable:
-    if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
-      goto FOUND_CTL;
-    }
-    ++buf;
+      continue;
+    NonPrintable:
+      if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
+        goto FOUND_CTL;
+      }
+      ++buf;
+    } while (likely(buf_end - buf >= 16));
+#endif
   }
   for (; ; ++buf) {
     CHECK_EOF();
