@@ -122,6 +122,18 @@ static void test_request(void)
   ok(bufis(headers[0].name, headers[0].name_len, "h"));
   ok(bufis(headers[0].value, headers[0].value_len, "c\xa2y"));
 
+  /* tests that SSE insns do not step over to \x7f */
+  ok(phr_parse_request("GET / HTTP/1.0\r\na: 0123456789abcde\x7f\r\n\r\n",
+                       sizeof("GET / HTTP/1.0\r\na: 0123456789abcde") -1,
+                       &method, &method_len, &path, &path_len, &minor_version,
+                       &headers, &num_headers, 0)
+     == -2);
+  ok(phr_parse_request("GET / HTTP/1.0\r\na: 0123456789abcdef\x7f\r\n\r\n",
+                       sizeof("GET / HTTP/1.0\r\na: 0123456789abcdef") -1,
+                       &method, &method_len, &path, &path_len, &minor_version,
+                       &headers, &num_headers, 0)
+     == -2);
+
 #undef PARSE
 }
 
