@@ -82,6 +82,26 @@ static const char* token_char_map =
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
+static const char* seek_str_range(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size)
+{
+  if (likely(buf_end - buf >= 16)) {
+    __m128i ranges16 = _mm_loadu_si128((const __m128i*)ranges);
+
+    size_t left = (buf_end - buf) & ~15;
+    do {
+      __m128i b16 = _mm_loadu_si128((void*)buf);
+      int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+      if (unlikely(r != 16)) {
+        buf += r;
+        break;
+      }
+      buf += 16;
+      left -= 16;
+    } while (likely(left != 0));
+  }
+  return buf;
+}
+
 static const char* get_token_to_eol(const char* buf, const char* buf_end,
                                     const char** token, size_t* token_len,
                                     int* ret)
@@ -237,6 +257,10 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       /* parsing name, but do not discard SP before colon, see
        * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
       headers[*num_headers].name = buf;
+#if __SSE4_2__
+      static const char ranges1[] __attribute__((aligned(16))) = "::\x00 ";
+      buf = seek_str_range(buf, buf_end, ranges1, sizeof(ranges1) - 1);
+#endif
       for (; ; ++buf) {
         CHECK_EOF();
         if (*buf == ':') {
