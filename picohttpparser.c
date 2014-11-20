@@ -262,7 +262,7 @@ static const char* parse_headers(const char* buf, const char* buf_end,
        * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
       headers[*num_headers].name = buf;
 #if __SSE4_2__
-      static const char ranges1[] __attribute__((aligned(16))) = "::\x00 ";
+      static const char ranges1[] __attribute__((aligned(16))) = "::\x00\037";
       buf = seek_str_range(buf, buf_end, ranges1, sizeof(ranges1) - 1);
 #endif
       for (; ; ++buf) {
