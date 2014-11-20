@@ -57,6 +57,8 @@
 
 #define ADVANCE_TOKEN(tok, toklen) do { \
     const char* tok_start = buf; \
+    static const char ranges2[] __attribute__((aligned(16))) = "\000\040\177\177"; \
+    buf = seek_str_range(buf, buf_end, ranges2, sizeof(ranges2) - 1); \
     for (; ; ++buf) { \
       CHECK_EOF(); \
       if (*buf == ' ') { \
@@ -84,6 +86,7 @@ static const char* token_char_map =
 
 static const char* seek_str_range(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size)
 {
+#if __SSE4_2__
   if (likely(buf_end - buf >= 16)) {
     __m128i ranges16 = _mm_loadu_si128((const __m128i*)ranges);
 
@@ -99,6 +102,7 @@ static const char* seek_str_range(const char* buf, const char* buf_end, const ch
       left -= 16;
     } while (likely(left != 0));
   }
+#endif
   return buf;
 }
 
