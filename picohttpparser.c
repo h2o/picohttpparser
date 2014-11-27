@@ -111,6 +111,17 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
 {
   const char* token_start = buf;
   
+#ifdef __SSE4_2__
+  static const char ranges1[] =
+    "\0\010"
+    /* allow HT */
+    "\012\037"
+    /* allow SP and up to but not including DEL */
+    "\177\177"
+    /* allow chars w. MSB set */
+    ;
+  buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1);
+#else
   /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
   while (likely(buf_end - buf >= 8)) {
 #define DOIT() if (unlikely(! IS_PRINTABLE_ASCII(*buf))) goto NonPrintable; ++buf
@@ -124,6 +135,7 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
     }
     ++buf;
   }
+#endif
   for (; ; ++buf) {
     CHECK_EOF();
     if (unlikely(! IS_PRINTABLE_ASCII(*buf))) {
