@@ -97,6 +97,15 @@ static void test_request(void)
   ok(headers[2].name == NULL);
   ok(bufis(headers[2].value, headers[2].value_len, "  \tc"));
   
+  PARSE("GET / HTTP/1.0\r\nfoo : ab\r\n\r\n", 0, 0,
+        "parse header name with trailing space");
+  ok(num_headers == 1);
+  ok(bufis(method, method_len, "GET"));
+  ok(bufis(path, path_len, "/"));
+  ok(minor_version == 0);
+  ok(bufis(headers[0].name, headers[0].name_len, "foo "));
+  ok(bufis(headers[0].value, headers[0].value_len, "ab"));
+
   PARSE("GET", 0, -2, "incomplete 1");
   ok(method == NULL);
   PARSE("GET ", 0, -2, "incomplete 2");
