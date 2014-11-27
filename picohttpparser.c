@@ -57,7 +57,7 @@
 #define ADVANCE_TOKEN(tok, toklen) do { \
     const char* tok_start = buf; \
     static const char ranges2[] __attribute__((aligned(16))) = "\000\040\177\177"; \
-    buf = seek_ranged_char(buf, buf_end, ranges2, sizeof(ranges2) - 1); \
+    buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1); \
     for (; ; ++buf) { \
       CHECK_EOF(); \
       if (*buf == ' ') { \
@@ -83,7 +83,7 @@ static const char* token_char_map =
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
-static const char* seek_ranged_char(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size)
+static const char* findchar_fast(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size)
 {
 #if __SSE4_2__
   if (likely(buf_end - buf >= 16)) {
@@ -240,7 +240,7 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       headers[*num_headers].name = buf;
 #if __SSE4_2__
       static const char ranges1[] __attribute__((aligned(16))) = "::\x00\037";
-      buf = seek_ranged_char(buf, buf_end, ranges1, sizeof(ranges1) - 1);
+      buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1);
 #endif
       for (; ; ++buf) {
         CHECK_EOF();
