@@ -59,8 +59,10 @@
     static const char ranges2[] __attribute__((aligned(16))) = "\000\040\177\177"; \
     int found2; \
     buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2); \
-    for (; ; ++buf) { \
+    if (! found2) { \
       CHECK_EOF(); \
+    } \
+    while (1) { \
       if (*buf == ' ') { \
         break; \
       } else if (unlikely(! IS_PRINTABLE_ASCII(*buf))) { \
@@ -69,6 +71,8 @@
           return NULL; \
         } \
       } \
+      ++buf; \
+      CHECK_EOF(); \
     } \
     tok = tok_start; \
     toklen = buf - tok_start; \
@@ -256,19 +260,21 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       /* parsing name, but do not discard SP before colon, see
        * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
       headers[*num_headers].name = buf;
-#if __SSE4_2__
       static const char ranges1[] __attribute__((aligned(16))) = "::\x00\037";
       int found;
       buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
-#endif
-      for (; ; ++buf) {
+      if (! found) {
         CHECK_EOF();
+      }
+      while (1) {
         if (*buf == ':') {
           break;
         } else if (*buf < ' ') {
           *ret = -1;
           return NULL;
         }
+        ++buf;
+        CHECK_EOF();
       }
       headers[*num_headers].name_len = buf - headers[*num_headers].name;
       ++buf;
