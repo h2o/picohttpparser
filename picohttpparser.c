@@ -24,6 +24,9 @@
  */
 
 #include <stddef.h>
+#ifdef __SSE4_2__
+# include <x86intrin.h>
+#endif
 #include "picohttpparser.h"
 
 /* $Id$ */
