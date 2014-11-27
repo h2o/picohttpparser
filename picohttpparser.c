@@ -57,7 +57,8 @@
 #define ADVANCE_TOKEN(tok, toklen) do { \
     const char* tok_start = buf; \
     static const char ranges2[] __attribute__((aligned(16))) = "\000\040\177\177"; \
-    buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1); \
+    int found2; \
+    buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2); \
     for (; ; ++buf) { \
       CHECK_EOF(); \
       if (*buf == ' ') { \
@@ -83,8 +84,9 @@ static const char* token_char_map =
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
-static const char* findchar_fast(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size)
+static const char* findchar_fast(const char* buf, const char* buf_end, const char *ranges, size_t ranges_size, int* found)
 {
+  *found = 0;
 #if __SSE4_2__
   if (likely(buf_end - buf >= 16)) {
     __m128i ranges16 = _mm_loadu_si128((const __m128i*)ranges);
@@ -95,6 +97,7 @@ static const char* findchar_fast(const char* buf, const char* buf_end, const cha
       int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
       if (unlikely(r != 16)) {
         buf += r;
+        *found = 1;
         break;
       }
       buf += 16;
@@ -120,7 +123,10 @@ static const char* get_token_to_eol(const char* buf, const char* buf_end,
     "\177\177"
     /* allow chars w. MSB set */
     ;
-  buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1);
+  int found;
+  buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
+  if (found)
+    goto FOUND_CTL;
 #else
   /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
   while (likely(buf_end - buf >= 8)) {
@@ -252,7 +258,8 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       headers[*num_headers].name = buf;
 #if __SSE4_2__
       static const char ranges1[] __attribute__((aligned(16))) = "::\x00\037";
-      buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1);
+      int found;
+      buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
 #endif
       for (; ; ++buf) {
         CHECK_EOF();
