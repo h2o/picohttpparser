@@ -17,7 +17,7 @@ The software is dual-licensed under the Perl License or the MIT License.
 Benchmark
 ---------
 
-![benchmark results](http://i.gyazo.com/7e098703c29128d69d02c9a216bfb6fb.png)
+![benchmark results](http://i.gyazo.com/0b00867f13c73c2bb4cece3ed341be96.png)
 
 The benchmark code is from [fukamachi/fast-http](https://github.com/fukamachi/fast-http/).
 
