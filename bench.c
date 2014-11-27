@@ -40,7 +40,7 @@ int main(void)
   size_t num_headers;
   int i, ret;
   
-  for (i = 0; i < 1000000; i++) {
+  for (i = 0; i < 10000000; i++) {
     num_headers = sizeof(headers) / sizeof(headers[0]);
     ret = phr_parse_request(REQ, sizeof(REQ) - 1, &method, &method_len, &path,
                             &path_len, &minor_version, headers, &num_headers,
