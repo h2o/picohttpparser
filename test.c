@@ -1,6 +1,7 @@
 /* use `make test` to run the test */
 /*
- * Copyright (c) 2009-2014 Kazuho Oku, Tokuhiro Matsuno, Daisuke Murase
+ * Copyright (c) 2009-2014 Kazuho Oku, Tokuhiro Matsuno, Daisuke Murase,
+ *                         Shigeo Mitsunari
  *
  * The software is licensed under either the MIT License (below) or the Perl
  * license.
