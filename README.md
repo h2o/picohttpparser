@@ -19,6 +19,8 @@ Usage
 
 The library exposes four functions: `phr_parse_request`, `phr_parse_response`, `phr_parse_headers`, `phr_decode_chunked`.
 
+### phr_parse_request
+
 The example below reads an HTTP request from socket `sock` using `read(2)`, parses it using `phr_parse_request`, and prints the details.
 
 ```
@@ -61,7 +63,11 @@ for (i = 0; i != num_headers; ++i) {
 }
 ```
 
+### phr_parse_response, phr_parse_headers
+
 `phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
+
+### phr_decode_chunked
 
 The example below decodes incoming data in chunked-encoding.  The data is decoded in-place.
 
