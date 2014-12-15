@@ -27,6 +27,8 @@
 #ifndef picohttpparser_h
 #define picohttpparser_h
 
+#include <sys/types.h>
+
 /* $Id$ */
 
 #ifdef __cplusplus
@@ -55,6 +57,30 @@ int phr_parse_response(const char* _buf, size_t len, int *minor_version,
               int *status, const char **msg, size_t *msg_len,
               struct phr_header* headers, size_t* num_headers,
               size_t last_len);
+
+/* ditto */
+int phr_parse_headers(const char* buf, size_t len, struct phr_header* headers,
+                      size_t* num_headers, size_t last_len);
+
+/* should be zero-filled before start */
+struct phr_chunked_decoder {
+  size_t bytes_left_in_chunk; /* number of bytes left in current chunk */
+  char consume_trailer; /* if trailing headers should be consumed */
+  char _hex_count;
+  char _state;
+};
+
+/* the function rewrites the buffer given as (buf, bufsz) removing the chunked-
+ * encoding headers.  When the function successfully returns, bufsz is updated
+ * to the length of the decoded data available.  Applications should repeatedly
+ * call the function while it returns -2 (incomplete) every time supplying newly
+ * arrived data.  Returns -1 on error, a non-negative number when end-of-stream
+ * was found within the supplied input.  In such case, the returned number
+ * indicates the number of octets left undecoded in the trailing area of the
+ * buffer.
+ */
+ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf,
+                           size_t *bufsz);
 
 #ifdef __cplusplus
 }

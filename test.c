@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "picotest/picotest.h"
 #include "picohttpparser.h"
@@ -245,9 +246,208 @@ static void test_response(void)
 #undef PARSE
 }
 
+static void test_headers(void)
+{
+  /* only test the interface; the core parser is tested by the tests above */
+
+  struct phr_header headers[4];
+  size_t num_headers;
+
+#define PARSE(s, last_len, exp, comment)                      \
+  do {                                                        \
+    note(comment);                                            \
+    num_headers = sizeof(headers) / sizeof(headers[0]);       \
+    ok(phr_parse_headers(s, strlen(s), headers, &num_headers, \
+                         last_len)                            \
+       == (exp == 0 ? strlen(s) : exp));                      \
+  } while (0)
+
+  PARSE("Host: example.com\r\nCookie: \r\n\r\n", 0, 0, "simple");
+  ok(num_headers == 2);
+  ok(bufis(headers[0].name, headers[0].name_len, "Host"));
+  ok(bufis(headers[0].value, headers[0].value_len, "example.com"));
+  ok(bufis(headers[1].name, headers[1].name_len, "Cookie"));
+  ok(bufis(headers[1].value, headers[1].value_len, ""));
+
+  PARSE("Host: example.com\r\nCookie: \r\n\r\n", 1, 0, "slowloris");
+  ok(num_headers == 2);
+  ok(bufis(headers[0].name, headers[0].name_len, "Host"));
+  ok(bufis(headers[0].value, headers[0].value_len, "example.com"));
+  ok(bufis(headers[1].name, headers[1].name_len, "Cookie"));
+  ok(bufis(headers[1].value, headers[1].value_len, ""));
+
+  PARSE("Host: example.com\r\nCookie: \r\n\r", 0, -2, "partial");
+
+  PARSE("Host: e\7fample.com\r\nCookie: \r\n\r", 0, -1, "error");
+
+#undef PARSE
+}
+
+static void test_chunked_at_once(int line, int consume_trailer,
+                                 const char *encoded, const char *decoded,
+                                 ssize_t expected)
+{
+  struct phr_chunked_decoder dec = {};
+  char *buf;
+  size_t bufsz;
+  ssize_t ret;
+
+  dec.consume_trailer = consume_trailer;
+
+  note("testing at-once, source at line %d", line);
+
+  buf = strdup(encoded);
+  bufsz = strlen(buf);
+
+  ret = phr_decode_chunked(&dec, buf, &bufsz);
+
+  ok(ret == expected);
+  ok(bufsz == strlen(decoded));
+  ok(bufis(buf, bufsz, decoded));
+  if (expected >= 0) {
+    if (ret == expected)
+      ok(bufis(buf + bufsz, ret, encoded + strlen(encoded) - ret));
+    else
+      ok(0);
+  }
+
+  free(buf);
+}
+
+static void test_chunked_per_byte(int line, int consume_trailer,
+                                  const char *encoded, const char *decoded,
+                                  ssize_t expected)
+{
+  struct phr_chunked_decoder dec = {};
+  char *buf = malloc(strlen(encoded) + 1);
+  size_t bytes_to_consume = strlen(encoded) - (expected >= 0 ? expected : 0),
+         bytes_ready = 0, bufsz, i;
+  ssize_t ret;
+
+  dec.consume_trailer = consume_trailer;
+
+  note("testing per-byte, source at line %d", line);
+
+  for (i = 0; i < bytes_to_consume - 1; ++i) {
+    buf[bytes_ready] = encoded[i];
+    bufsz = 1;
+    ret = phr_decode_chunked(&dec, buf + bytes_ready, &bufsz);
+    if (ret != -2) {
+      ok(0);
+      return;
+    }
+    bytes_ready += bufsz;
+  }
+  strcpy(buf + bytes_ready, encoded + bytes_to_consume - 1);
+  bufsz = strlen(buf + bytes_ready);
+  ret = phr_decode_chunked(&dec, buf + bytes_ready, &bufsz);
+  ok(ret == expected);
+  bytes_ready += bufsz;
+  ok(bytes_ready == strlen(decoded));
+  ok(bufis(buf, bytes_ready, decoded));
+  if (expected >= 0) {
+    if (ret == expected)
+      ok(bufis(buf + bytes_ready, expected, encoded + bytes_to_consume));
+    else
+      ok(0);
+  }
+
+  free(buf);
+}
+
+static void test_chunked_failure(int line, const char *encoded, ssize_t expected)
+{
+  struct phr_chunked_decoder dec = {};
+  char *buf = strdup(encoded);
+  size_t bufsz, i;
+  ssize_t ret;
+
+  note("testing failure at-once, source at line %d", line);
+  bufsz = strlen(buf);
+  ret = phr_decode_chunked(&dec, buf, &bufsz);
+  ok(ret == expected);
+
+  note("testing failure per-byte, source at line %d", line);
+  memset(&dec, 0, sizeof(dec));
+  for (i = 0; encoded[i] != '\0'; ++i) {
+    buf[0] = encoded[i];
+    bufsz = 1;
+    ret = phr_decode_chunked(&dec, buf, &bufsz);
+    if (ret == -1) {
+      ok(ret == expected);
+      return;
+    } else if (ret == -2) {
+      /* continue */
+    } else {
+      ok(0);
+      return;
+    }
+  }
+  ok(ret == expected);
+
+  free(buf);
+}
+
+static void (*chunked_test_runners[])(int, int, const char*, const char *,
+                                      ssize_t) = {
+  test_chunked_at_once,
+  test_chunked_per_byte,
+  NULL
+};
+
+static void test_chunked(void)
+{
+  size_t i;
+
+  for (i = 0; chunked_test_runners[i] != NULL; ++i) {
+    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world",
+                            0);
+    chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\n",
+                            "hello world", 0);
+    chunked_test_runners[i](__LINE__, 0, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n",
+                            "hello world", 0);
+    chunked_test_runners[i](__LINE__, 0,
+                            "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
+                            "hello world", sizeof("a: b\r\nc: d\r\n\r\n") - 1);
+    chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world",
+                            0);
+  }
+
+  note("failures");
+  test_chunked_failure(__LINE__, "z\r\nabcdefg", -1);
+  if (sizeof(size_t) == 8) {
+    test_chunked_failure(__LINE__, "6\r\nhello \r\nffffffffffffffff\r\nabcdefg", -2);
+    test_chunked_failure(__LINE__, "6\r\nhello \r\nfffffffffffffffff\r\nabcdefg", -1);
+  }
+}
+
+static void test_chunked_consume_trailer(void)
+{
+  size_t i;
+
+  for (i = 0; chunked_test_runners[i] != NULL; ++i) {
+    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world\r\n0\r\n", "hello world",
+                            -2);
+    chunked_test_runners[i](__LINE__, 1, "6\r\nhello \r\n5\r\nworld\r\n0\r\n",
+                            "hello world", -2);
+    chunked_test_runners[i](__LINE__, 1, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n",
+                            "hello world", -2);
+    chunked_test_runners[i](__LINE__, 1, "b\r\nhello world\r\n0\r\n\r\n",
+                            "hello world", 0);
+    chunked_test_runners[i](__LINE__, 1, "b\nhello world\n0\n\n",
+                            "hello world", 0);
+    chunked_test_runners[i](__LINE__, 1,
+                            "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n",
+                            "hello world", 0);
+  }
+}
+
 int main(int argc, char **argv)
 {
   subtest("request", test_request);
   subtest("response", test_response);
+  subtest("headers", test_headers);
+  subtest("chunked", test_chunked);
+  subtest("chunked-consume-trailer", test_chunked_consume_trailer);
   return done_testing();
 }
