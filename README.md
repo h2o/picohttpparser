@@ -52,7 +52,7 @@ while (1) {
         return RequestIsTooLongError;
 }
 
-printf("request is %d bytes long\n", buflen);
+printf("request is %d bytes long\n", pret);
 printf("method is %.*s\n", (int)method_len, method);
 printf("path is %.*s\n", (int)path_len, path);
 printf("HTTP version is 1.%d\n", minor_version);
