@@ -93,8 +93,8 @@ do {
         ;
     if (rret <= 0)
         return IOError;
+    /* decode */
     rsize = rret;
-    /* 
     pret = phr_decode_chunked(&decoder, buf + size, &rsize);
     if (pret == -1)
         return ParseError;
