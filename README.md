@@ -94,11 +94,11 @@ do {
     if (rret <= 0)
         return IOError;
     rsize = rret;
-    /* 
+    /* decode */
     pret = phr_decode_chunked(&decoder, buf + size, &rsize);
     if (pret == -1)
         return ParseError;
-    size += resize;
+    size += rsize;
 } while (pret == -2);
 
 /* successfully decoded the chunked data */
