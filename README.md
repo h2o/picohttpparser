@@ -55,9 +55,10 @@ printf("method is %.*s\n", (int)method_len, method);
 printf("path is %.*s\n", (int)path_len, path);
 printf("HTTP version is 1.%d\n", minor_version);
 printf("headers:\n");
-for (i = 0; i != num_headers; ++i)
-  printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
-         (int)headers[i].value_len, headers[i].value);
+for (i = 0; i != num_headers; ++i) {
+    printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
+           (int)headers[i].value_len, headers[i].value);
+}
 ```
 
 `phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
