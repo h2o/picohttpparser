@@ -14,6 +14,53 @@ Check out [test.c] to find out how to use the parser.
 
 The software is dual-licensed under the Perl License or the MIT License.
 
+Usage
+-----
+
+The library exposes four functions: `phr_parse_request`, `phr_parse_response`, `phr_parse_headers`, `phr_decode_chunked`.
+
+The example below reads an HTTP request from socket `sock` using `read(2)`, parses it using `phr_parse_request`, and prints the details.
+
+```
+char buf[4096], *method, *path;
+int pret, minor_version;
+struct phr_header headers[100];
+size_t buflen = 0, prevbuflen = 0, method_len, path_len, num_headers;
+ssize_t rret;
+
+while (1) {
+    /* read the request */
+    while ((rret = read(sock, buf + len, sizeof(buf) - len)) == -1 && errno == EINTR)
+        ;
+    if (rret <= 0)
+        return IOError;
+    len += rret;
+    /* parse the request */
+    num_headers = sizeof(headers) / sizeof(headers[0]);
+    pret = phr_parse_request(rbuf, rlen, &method, &method_len, &path, &path_len,
+                             &minor_version, &headers, &num_headers, prevbuflen);
+    if (pret > 0)
+        break; /* successfully parsed the request */
+    else if (pret == -1)
+        return ParseError;
+    /* request is incomplete, continue the loop */
+    if (buflen == sizeof(buf))
+        return RequestIsTooLongError;
+    prevbuflen = buflen;
+}
+
+printf("request is %d bytes long\n", rlen);
+printf("method is %.*s\n", (int)method_len, method);
+printf("path is %.*s\n", (int)path_len, path);
+printf("HTTP version is 1.%d\n", minor_version);
+printf("headers:\n");
+for (i = 0; i != num_headers; ++i)
+  printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
+         (int)headers[i].value_len, headers[i].value);
+```
+
+`phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
+
 Benchmark
 ---------
 
