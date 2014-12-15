@@ -44,6 +44,7 @@ while (1) {
     else if (pret == -1)
         return ParseError;
     /* request is incomplete, continue the loop */
+    assert(pret == -2);
     if (buflen == sizeof(buf))
         return RequestIsTooLongError;
     prevbuflen = buflen;
