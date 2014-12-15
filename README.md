@@ -38,7 +38,7 @@ while (1) {
     /* parse the request */
     num_headers = sizeof(headers) / sizeof(headers[0]);
     pret = phr_parse_request(rbuf, rlen, &method, &method_len, &path, &path_len,
-                             &minor_version, &headers, &num_headers, prevbuflen);
+                             &minor_version, headers, &num_headers, prevbuflen);
     if (pret > 0)
         break; /* successfully parsed the request */
     else if (pret == -1)
