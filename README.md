@@ -63,6 +63,43 @@ for (i = 0; i != num_headers; ++i) {
 
 `phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
 
+The example below decodes incoming data in chunked-encoding.  The data is decoded in-place.
+
+```
+struct phr_chunked_decoder decoder = {}; /* zero-clear */
+char *buf = malloc(4096);
+size_t size = 0, capacity = 4096, rsize;
+ssize_t rret, pret;
+
+/* set consume_trailer to 1 to discard the trailing header, or the application
+ * should call phr_parse_headers to parse the trailing header */
+decoder.consume_trailer = 1;
+
+do {
+    /* expand the buffer if necessary */
+    if (size == capacity) {
+        capacity *= 2;
+        buf = realloc(buf, capacity);
+        assert(buf != NULL);
+    }
+    /* read */
+    while ((rret = read(sock, buf + size, capacity - size)) == -1 && errno == EINTR)
+        ;
+    if (rret <= 0)
+        return IOError;
+    rsize = rret;
+    /* 
+    pret = phr_decode_chunked(&decoder, buf + size, &rsize);
+    if (pret == -1)
+        return ParseError;
+    size += resize;
+} while (pret == -2);
+
+/* successfully decoded the chunked data */
+assert(pret >= 0);
+printf("decoded data is at %p (%zu bytes)\n", buf, size);
+```
+
 Benchmark
 ---------
 
