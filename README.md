@@ -32,14 +32,15 @@ ssize_t rret;
 
 while (1) {
     /* read the request */
-    while ((rret = read(sock, buf + len, sizeof(buf) - len)) == -1 && errno == EINTR)
+    while ((rret = read(sock, buf + buflen, sizeof(buf) - buflen)) == -1 && errno == EINTR)
         ;
     if (rret <= 0)
         return IOError;
-    len += rret;
+    prevbuflen = buflen;
+    buflen += rret;
     /* parse the request */
     num_headers = sizeof(headers) / sizeof(headers[0]);
-    pret = phr_parse_request(rbuf, rlen, &method, &method_len, &path, &path_len,
+    pret = phr_parse_request(buf, buflen, &method, &method_len, &path, &path_len,
                              &minor_version, headers, &num_headers, prevbuflen);
     if (pret > 0)
         break; /* successfully parsed the request */
@@ -49,10 +50,9 @@ while (1) {
     assert(pret == -2);
     if (buflen == sizeof(buf))
         return RequestIsTooLongError;
-    prevbuflen = buflen;
 }
 
-printf("request is %d bytes long\n", rlen);
+printf("request is %d bytes long\n", buflen);
 printf("method is %.*s\n", (int)method_len, method);
 printf("path is %.*s\n", (int)path_len, path);
 printf("HTTP version is 1.%d\n", minor_version);
