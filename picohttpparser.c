@@ -300,11 +300,12 @@ static const char* parse_headers(const char* buf, const char* buf_end,
   return buf;
 }
 
-const char* parse_request(const char* buf, const char* buf_end,
-                          const char** method, size_t* method_len,
-                          const char** path, size_t* path_len,
-                          int* minor_version, struct phr_header* headers,
-                          size_t* num_headers, size_t max_headers, int* ret)
+static const char* parse_request(const char* buf, const char* buf_end,
+                                 const char** method, size_t* method_len,
+                                 const char** path, size_t* path_len,
+                                 int* minor_version, struct phr_header* headers,
+                                 size_t* num_headers, size_t max_headers,
+                                 int* ret)
 {
   /* skip first empty line (some clients add CRLF after POST content) */
   CHECK_EOF();
