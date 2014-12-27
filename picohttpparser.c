@@ -28,7 +28,11 @@
 #include <stddef.h>
 #include <string.h>
 #ifdef __SSE4_2__
-# include <x86intrin.h>
+# ifdef _MSC_VER
+#  include <nmmintrin.h>
+# else
+#  include <x86intrin.h>
+# endif
 #endif
 #include "picohttpparser.h"
 
@@ -40,6 +44,12 @@
 #else
 # define likely(x) (x)
 # define unlikely(x) (x)
+#endif
+
+#ifdef _MSC_VER
+# define ALIGNED(n) _declspec(align(n))
+#else
+# define ALIGNED(n) __attribute__((aligned(n)))
 #endif
 
 #define IS_PRINTABLE_ASCII(c) ((unsigned char)(c) - 040u < 0137u)
@@ -59,7 +69,7 @@
 
 #define ADVANCE_TOKEN(tok, toklen) do { \
     const char* tok_start = buf; \
-    static const char ranges2[] __attribute__((aligned(16))) = "\000\040\177\177"; \
+    static const char ALIGNED(16) ranges2[] = "\000\040\177\177"; \
     int found2; \
     buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2); \
     if (! found2) { \
@@ -263,7 +273,7 @@ static const char* parse_headers(const char* buf, const char* buf_end,
       /* parsing name, but do not discard SP before colon, see
        * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
       headers[*num_headers].name = buf;
-      static const char ranges1[] __attribute__((aligned(16))) = "::\x00\037";
+      static const char ALIGNED(16) ranges1[] = "::\x00\037";
       int found;
       buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
       if (! found) {

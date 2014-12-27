@@ -287,7 +287,7 @@ static void test_chunked_at_once(int line, int consume_trailer,
                                  const char *encoded, const char *decoded,
                                  ssize_t expected)
 {
-  struct phr_chunked_decoder dec = {};
+  struct phr_chunked_decoder dec = {0};
   char *buf;
   size_t bufsz;
   ssize_t ret;
@@ -318,7 +318,7 @@ static void test_chunked_per_byte(int line, int consume_trailer,
                                   const char *encoded, const char *decoded,
                                   ssize_t expected)
 {
-  struct phr_chunked_decoder dec = {};
+  struct phr_chunked_decoder dec = {0};
   char *buf = malloc(strlen(encoded) + 1);
   size_t bytes_to_consume = strlen(encoded) - (expected >= 0 ? expected : 0),
          bytes_ready = 0, bufsz, i;
@@ -357,7 +357,7 @@ static void test_chunked_per_byte(int line, int consume_trailer,
 
 static void test_chunked_failure(int line, const char *encoded, ssize_t expected)
 {
-  struct phr_chunked_decoder dec = {};
+  struct phr_chunked_decoder dec = {0};
   char *buf = strdup(encoded);
   size_t bufsz, i;
   ssize_t ret;
