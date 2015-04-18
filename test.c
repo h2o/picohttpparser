@@ -234,7 +234,7 @@ static void test_response(void)
   ok(bufis(headers[0].name, headers[0].name_len, "A"));
   ok(bufis(headers[0].value, headers[0].value_len, "1"));
   
-  PARSE("HTTP/1.0 200 OK\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
+  PARSE("HTTP/1.0 200 OK\r\n\r", strlen("HTTP/1.0 200 OK\r\n\r") - 1,
         -2, "slowloris (incomplete)");
   PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
         0, "slowloris (complete)");
