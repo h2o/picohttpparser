@@ -45,7 +45,7 @@ static void test_request(void)
   int minor_version;
   struct phr_header headers[4];
   size_t num_headers;
-  
+
 #define PARSE(s, last_len, exp, comment)                                \
   do {                                                                  \
     note(comment);                                                      \
@@ -55,15 +55,15 @@ static void test_request(void)
                          &num_headers, last_len)                        \
        == (exp == 0 ? strlen(s) : exp));                                \
   } while (0)
-  
+
   PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
   ok(num_headers == 0);
   ok(bufis(method, method_len, "GET"));
   ok(bufis(path, path_len, "/"));
   ok(minor_version == 0);
-  
+
   PARSE("GET / HTTP/1.0\r\n\r", 0, -2, "partial");
-  
+
   PARSE("GET /hoge HTTP/1.1\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
         "parse headers");
   ok(num_headers == 2);
@@ -98,7 +98,7 @@ static void test_request(void)
   ok(bufis(headers[1].value, headers[1].value_len, "b"));
   ok(headers[2].name == NULL);
   ok(bufis(headers[2].value, headers[2].value_len, "  \tc"));
-  
+
   PARSE("GET / HTTP/1.0\r\nfoo : ab\r\n\r\n", 0, 0,
         "parse header name with trailing space");
   ok(num_headers == 1);
@@ -122,12 +122,12 @@ static void test_request(void)
   ok(minor_version == -1);
   PARSE("GET / HTTP/1.0\r", 0, -2, "incomplete 8");
   ok(minor_version == 0);
-  
+
   PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1,
         -2, "slowloris (incomplete)");
   PARSE("GET /hoge HTTP/1.0\r\n\r\n", strlen("GET /hoge HTTP/1.0\r\n\r\n") - 1,
         0, "slowloris (complete)");
-  
+
   PARSE("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name");
   PARSE("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)");
 
@@ -157,7 +157,7 @@ static void test_response(void)
   size_t msg_len;
   struct phr_header headers[4];
   size_t num_headers;
-  
+
 #define PARSE(s, last_len, exp, comment)                         \
   do {                                                           \
     note(comment);                                               \
@@ -167,13 +167,13 @@ static void test_response(void)
                          &num_headers, last_len)                 \
        == (exp == 0 ? strlen(s) : exp));                         \
   } while (0)
-  
+
   PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
   ok(num_headers == 0);
   ok(status      == 200);
   ok(minor_version = 1);
   ok(bufis(msg, msg_len, "OK"));
-  
+
   PARSE("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial");
 
   PARSE("HTTP/1.1 200 OK\r\nHost: example.com\r\nCookie: \r\n\r\n", 0, 0,
@@ -207,7 +207,7 @@ static void test_response(void)
   ok(status == 500);
   ok(bufis(msg, msg_len, "Internal Server Error"));
   ok(msg_len == sizeof("Internal Server Error")-1);
-  
+
   PARSE("H", 0, -2, "incomplete 1");
   PARSE("HTTP/1.", 0, -2, "incomplete 2");
   PARSE("HTTP/1.1", 0, -2, "incomplete 3");
@@ -233,16 +233,16 @@ static void test_response(void)
   ok(num_headers == 1);
   ok(bufis(headers[0].name, headers[0].name_len, "A"));
   ok(bufis(headers[0].value, headers[0].value_len, "1"));
-  
+
   PARSE("HTTP/1.0 200 OK\r\n\r", strlen("HTTP/1.0 200 OK\r\n\r") - 1,
         -2, "slowloris (incomplete)");
   PARSE("HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n") - 1,
         0, "slowloris (complete)");
-  
+
   PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
   PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
   PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
-  
+
 #undef PARSE
 }
 
