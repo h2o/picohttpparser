@@ -274,6 +274,8 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
             return NULL;
         }
         if (!(*num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
+            static const char ALIGNED(16) ranges1[] = "::\x00\037";
+            int found;
             if (!token_char_map[(unsigned char)*buf]) {
                 *ret = -1;
                 return NULL;
@@ -281,8 +283,6 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
             /* parsing name, but do not discard SP before colon, see
              * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
             headers[*num_headers].name = buf;
-            static const char ALIGNED(16) ranges1[] = "::\x00\037";
-            int found;
             buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
             if (!found) {
                 CHECK_EOF();
