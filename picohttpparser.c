@@ -121,6 +121,11 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
             left -= 16;
         } while (likely(left != 0));
     }
+#else
+    /* suppress unused parameter warning */
+    (void)buf_end;
+    (void)ranges;
+    (void)ranges_size;
 #endif
     return buf;
 }
