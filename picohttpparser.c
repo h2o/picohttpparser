@@ -305,7 +305,10 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
                 ++buf;
                 CHECK_EOF();
             }
-            headers[*num_headers].name_len = buf - headers[*num_headers].name;
+            if ((headers[*num_headers].name_len = buf - headers[*num_headers].name) == 0) {
+                *ret = -1;
+                return NULL;
+            }
             ++buf;
             for (;; ++buf) {
                 CHECK_EOF();
