@@ -79,6 +79,9 @@ struct phr_chunked_decoder {
  */
 ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_t *bufsz);
 
+/* returns if the chunked decoder is in middle of chunked data */
+int phr_decode_chunked_is_in_data(struct phr_chunked_decoder *decoder);
+
 #ifdef __cplusplus
 }
 #endif
