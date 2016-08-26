@@ -133,6 +133,13 @@ static void test_request(void)
     ok(bufis(headers[0].name, headers[0].name_len, "h"));
     ok(bufis(headers[0].value, headers[0].value_len, "c\xa2y"));
 
+    PARSE("GET / HTTP/1.0\r\n\x7c\x7e: 1\r\n\r\n", 0, 0, "accept |~ (though forbidden by SSE)");
+    ok(num_headers == 1);
+    ok(bufis(headers[0].name, headers[0].name_len, "\x7c\x7e"));
+    ok(bufis(headers[0].value, headers[0].value_len, "1"));
+
+    PARSE("GET / HTTP/1.0\r\n\x7b: 1\r\n\r\n", 0, -1, "disallow {");
+
 #undef PARSE
 }
 
