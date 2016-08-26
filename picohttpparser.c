@@ -602,7 +602,7 @@ Exit:
     return ret;
 }
 
-int phr_decoder_in_data(struct phr_chunked_decoder *decoder)
+int phr_decode_chunked_is_in_data(struct phr_chunked_decoder *decoder)
 {
     return decoder->_state == CHUNKED_IN_CHUNK_DATA;
 }
