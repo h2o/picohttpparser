@@ -110,7 +110,7 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
 
         size_t left = (buf_end - buf) & ~15;
         do {
-            __m128i b16 = _mm_loadu_si128((void *)buf);
+            __m128i b16 = _mm_loadu_si128((const __m128i*)buf);
             int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
             if (unlikely(r != 16)) {
                 buf += r;
