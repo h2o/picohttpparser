@@ -163,7 +163,7 @@ static void test_response(void)
     PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
     ok(num_headers == 0);
     ok(status == 200);
-    ok(minor_version = 1);
+    ok(minor_version == 0);
     ok(bufis(msg, msg_len, "OK"));
 
     PARSE("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial");
