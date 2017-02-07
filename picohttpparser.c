@@ -60,12 +60,15 @@
         return NULL;                                                                                                               \
     }
 
-#define EXPECT_CHAR(ch)                                                                                                            \
-    CHECK_EOF();                                                                                                                   \
+#define EXPECT_CHAR_NO_CHECK(ch)                                                                                                   \
     if (*buf++ != ch) {                                                                                                            \
         *ret = -1;                                                                                                                 \
         return NULL;                                                                                                               \
     }
+
+#define EXPECT_CHAR(ch)                                                                                                            \
+    CHECK_EOF();                                                                                                                   \
+    EXPECT_CHAR_NO_CHECK(ch);
 
 #define ADVANCE_TOKEN(tok, toklen)                                                                                                 \
     do {                                                                                                                           \
@@ -225,40 +228,42 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     return NULL;
 }
 
-/* *_buf is always within [buf, buf_end) upon success */
-static const char *parse_int(const char *buf, const char *buf_end, int *value, int *ret)
-{
-    int v;
-    CHECK_EOF();
-    if (!('0' <= *buf && *buf <= '9')) {
-        *ret = -1;
-        return NULL;
-    }
-    v = 0;
-    for (;; ++buf) {
-        CHECK_EOF();
-        if ('0' <= *buf && *buf <= '9') {
-            v = v * 10 + *buf - '0';
-        } else {
-            break;
-        }
-    }
+#define PARSE_INT(valp_, mul_)                                                                                                     \
+    if (*buf < '0' || '9' < *buf) {                                                                                                \
+        buf++;                                                                                                                     \
+        *ret = -1;                                                                                                                 \
+        return NULL;                                                                                                               \
+    }                                                                                                                              \
+    *(valp_) = (mul_) * (*buf++ - '0');
 
-    *value = v;
-    return buf;
-}
+#define PARSE_INT_3(valp_)                                                                                                         \
+    do {                                                                                                                           \
+        int res_ = 0;                                                                                                              \
+        PARSE_INT(&res_, 100)                                                                                                      \
+        *valp_ = res_;                                                                                                             \
+        PARSE_INT(&res_, 10)                                                                                                       \
+        *valp_ += res_;                                                                                                            \
+        PARSE_INT(&res_, 1)                                                                                                        \
+        *valp_ += res_;                                                                                                            \
+    } while (0)
 
 /* returned pointer is always within [buf, buf_end), or null */
 static const char *parse_http_version(const char *buf, const char *buf_end, int *minor_version, int *ret)
 {
-    EXPECT_CHAR('H');
-    EXPECT_CHAR('T');
-    EXPECT_CHAR('T');
-    EXPECT_CHAR('P');
-    EXPECT_CHAR('/');
-    EXPECT_CHAR('1');
-    EXPECT_CHAR('.');
-    return parse_int(buf, buf_end, minor_version, ret);
+    /* we want at least [HTTP/1.<two chars>] to try to parse */
+    if (buf_end - buf < 9) {
+        *ret = -2;
+        return NULL;
+    }
+    EXPECT_CHAR_NO_CHECK('H');
+    EXPECT_CHAR_NO_CHECK('T');
+    EXPECT_CHAR_NO_CHECK('T');
+    EXPECT_CHAR_NO_CHECK('P');
+    EXPECT_CHAR_NO_CHECK('/');
+    EXPECT_CHAR_NO_CHECK('1');
+    EXPECT_CHAR_NO_CHECK('.');
+    PARSE_INT(minor_version, 1);
+    return buf;
 }
 
 static const char *parse_headers(const char *buf, const char *buf_end, struct phr_header *headers, size_t *num_headers,
@@ -401,10 +406,13 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
         *ret = -1;
         return NULL;
     }
-    /* parse status code */
-    if ((buf = parse_int(buf, buf_end, status, ret)) == NULL) {
+    /* parse status code, we want at least [:digit:][:digit:][:digit:]<other char> to try to parse */
+    if (buf_end - buf < 4) {
+        *ret = -2;
         return NULL;
     }
+    PARSE_INT_3(status);
+
     /* skip space */
     if (*buf++ != ' ') {
         *ret = -1;
