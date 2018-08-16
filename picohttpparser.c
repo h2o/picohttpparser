@@ -73,9 +73,9 @@
 #define ADVANCE_TOKEN(tok, toklen)                                                                                                 \
     do {                                                                                                                           \
         const char *tok_start = buf;                                                                                               \
-        static const char ALIGNED(16) ranges2[] = "\000\040\177\177";                                                              \
+        static const char ALIGNED(16) ranges2[16] = "\000\040\177\177";                                                            \
         int found2;                                                                                                                \
-        buf = findchar_fast(buf, buf_end, ranges2, sizeof(ranges2) - 1, &found2);                                                  \
+        buf = findchar_fast(buf, buf_end, ranges2, 4, &found2);                                                                    \
         if (!found2) {                                                                                                             \
             CHECK_EOF();                                                                                                           \
         }                                                                                                                          \
@@ -138,7 +138,7 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
     const char *token_start = buf;
 
 #ifdef __SSE4_2__
-    static const char ranges1[] = "\0\010"
+    static const char ranges1[16] = "\0\010"
                                   /* allow HT */
                                   "\012\037"
                                   /* allow SP and up to but not including DEL */
@@ -146,7 +146,7 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
         /* allow chars w. MSB set */
         ;
     int found;
-    buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
+    buf = findchar_fast(buf, buf_end, ranges1, 6, &found);
     if (found)
         goto FOUND_CTL;
 #else
