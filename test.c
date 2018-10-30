@@ -140,6 +140,9 @@ static void test_request(void)
 
     PARSE("GET / HTTP/1.0\r\n\x7b: 1\r\n\r\n", 0, -1, "disallow {");
 
+    PARSE("GET / HTTP/1.0\r\nfoo: a \t \r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
+    ok(bufis(headers[0].value, headers[0].value_len, "a"));
+
 #undef PARSE
 }
 
@@ -229,6 +232,9 @@ static void test_response(void)
     PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
     PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
     PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
+
+    PARSE("HTTP/1.1 200 OK\r\nbar: \t b\t \t\r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
+    ok(bufis(headers[0].value, headers[0].value_len, "b"));
 
 #undef PARSE
 }
