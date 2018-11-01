@@ -325,9 +325,21 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
             headers[*num_headers].name = NULL;
             headers[*num_headers].name_len = 0;
         }
-        if ((buf = get_token_to_eol(buf, buf_end, &headers[*num_headers].value, &headers[*num_headers].value_len, ret)) == NULL) {
+        const char *value;
+        size_t value_len;
+        if ((buf = get_token_to_eol(buf, buf_end, &value, &value_len, ret)) == NULL) {
             return NULL;
         }
+        /* remove trailing SPs and HTABs */
+        const char *value_end = value + value_len;
+        for (; value_end != value; --value_end) {
+            const char c = *(value_end - 1);
+            if (!(c == ' ' || c == '\t')) {
+                break;
+            }
+        }
+        headers[*num_headers].value = value;
+        headers[*num_headers].value_len = value_end - value;
     }
     return buf;
 }
