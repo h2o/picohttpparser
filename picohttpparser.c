@@ -362,6 +362,10 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     ++buf;
     ADVANCE_TOKEN(*path, *path_len);
     ++buf;
+    if (*method_len == 0 || *path_len == 0) {
+        *ret = -1;
+        return NULL;
+    }
     if ((buf = parse_http_version(buf, buf_end, minor_version, ret)) == NULL) {
         return NULL;
     }

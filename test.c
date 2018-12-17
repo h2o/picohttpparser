@@ -114,6 +114,9 @@ static void test_request(void)
     PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1, -2, "slowloris (incomplete)");
     PARSE("GET /hoge HTTP/1.0\r\n\r\n", strlen("GET /hoge HTTP/1.0\r\n\r\n") - 1, 0, "slowloris (complete)");
 
+    PARSE(" / HTTP/1.0\r\n\r\n", 0, -1, "empty method");
+    PARSE("GET  HTTP/1.0\r\n\r\n", 0, -1, "empty request-target");
+
     PARSE("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name");
     PARSE("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)");
 
