@@ -429,13 +429,18 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
     }
     PARSE_INT_3(status);
 
-    /* skip space */
-    if (*buf++ != ' ') {
-        *ret = -1;
-        return NULL;
+    int has_sp = *buf == ' ';
+    if (has_sp) {
+        /* skip space */
+        ++buf;
     }
     /* get message */
     if ((buf = get_token_to_eol(buf, buf_end, msg, msg_len, ret)) == NULL) {
+        return NULL;
+    }
+    if (!has_sp && *msg_len != 0) {
+        /* garbage found after status code */
+        *ret = -1;
         return NULL;
     }
 
