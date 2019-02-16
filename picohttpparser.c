@@ -429,16 +429,17 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
     }
     PARSE_INT_3(status);
 
-    int has_sp = *buf == ' ';
-    if (has_sp) {
-        /* skip space */
-        ++buf;
-    }
-    /* get message */
+    /* get message includig preceding space */
     if ((buf = get_token_to_eol(buf, buf_end, msg, msg_len, ret)) == NULL) {
         return NULL;
     }
-    if (!has_sp && *msg_len != 0) {
+    if (*msg_len == 0) {
+        /* ok */
+    } else if (**msg == ' ') {
+        /* remove preceding space */
+        ++*msg;
+        --*msg_len;
+    } else {
         /* garbage found after status code */
         *ret = -1;
         return NULL;
