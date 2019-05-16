@@ -359,9 +359,13 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
 
     /* parse request line */
     ADVANCE_TOKEN(*method, *method_len);
-    ++buf;
+    do {
+        ++buf;
+    } while (*buf == ' ');
     ADVANCE_TOKEN(*path, *path_len);
-    ++buf;
+    do {
+        ++buf;
+    } while (*buf == ' ');
     if (*method_len == 0 || *path_len == 0) {
         *ret = -1;
         return NULL;
@@ -418,10 +422,13 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
         return NULL;
     }
     /* skip space */
-    if (*buf++ != ' ') {
+    if (*buf != ' ') {
         *ret = -1;
         return NULL;
     }
+    do {
+        ++buf;
+    } while (*buf == ' ');
     /* parse status code, we want at least [:digit:][:digit:][:digit:]<other char> to try to parse */
     if (buf_end - buf < 4) {
         *ret = -2;
@@ -437,8 +444,10 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
         /* ok */
     } else if (**msg == ' ') {
         /* remove preceding space */
-        ++*msg;
-        --*msg_len;
+        do {
+            ++*msg;
+            --*msg_len;
+        } while (**msg == ' ');
     } else {
         /* garbage found after status code */
         *ret = -1;

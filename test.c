@@ -146,6 +146,8 @@ static void test_request(void)
     PARSE("GET / HTTP/1.0\r\nfoo: a \t \r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
     ok(bufis(headers[0].value, headers[0].value_len, "a"));
 
+    PARSE("GET   /   HTTP/1.0\r\n\r\n", 0, 0, "accept multiple spaces between tokens");
+
 #undef PARSE
 }
 
@@ -244,6 +246,8 @@ static void test_response(void)
 
     PARSE("HTTP/1.1 200 OK\r\nbar: \t b\t \t\r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
     ok(bufis(headers[0].value, headers[0].value_len, "b"));
+
+    PARSE("HTTP/1.1   200   OK\r\n\r\n", 0, 0, "accept multiple spaces between tokens");
 
 #undef PARSE
 }
