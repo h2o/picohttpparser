@@ -520,6 +520,25 @@ static int decode_hex(int ch)
     }
 }
 
+/*
+ * chunked-body   = *chunk
+ *                  last-chunk
+ *                  trailer-part
+ *                  CRLF
+ * chunk          = chunk-size [ chunk-ext ] CRLF
+ *                  chunk-data CRLF
+ * chunk-size     = 1*HEXDIG
+ * last-chunk     = 1*("0") [ chunk-ext ] CRLF
+ * chunk-data     = 1*OCTET ; a sequence of chunk-size octets
+ * chunk-ext      = *( ";" chunk-ext-name [ "=" chunk-ext-val ] )
+ * chunk-ext-name = token
+ * chunk-ext-val  = token / quoted-string
+ * trailer-part   = *( header-field CRLF )
+ ***
+ * returns -2 - incomplete
+ *         -1 - error
+ *         >= 0 bytes unprocessed in the buffer
+**/
 ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_t *_bufsz)
 {
     size_t dst = 0, src = 0, bufsz = *_bufsz;
@@ -547,6 +566,7 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
                 ++decoder->_hex_count;
             }
             decoder->_hex_count = 0;
+	    decoder->cr_seen = 0;
             decoder->_state = CHUNKED_IN_CHUNK_EXT;
         /* fallthru */
         case CHUNKED_IN_CHUNK_EXT:
@@ -554,16 +574,24 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
             for (;; ++src) {
                 if (src == bufsz)
                     goto Exit;
-                if (buf[src] == '\012')
-                    break;
+                if (buf[src] == '\015') {
+                    decoder->cr_seen = 1;
+		} else if (buf[src] == '\012' && decoder->cr_seen) {
+                    break; //CRLF seen, process next line
+                } else if ((buf[src] != '\012' && decoder->cr_seen) || (buf[src] == '\012' && !decoder->cr_seen)) {
+                    // LF must follow CR
+                    ret = -1;
+                    goto Exit;
+                } else if (decoder->cr_seen) {
+                    decoder->cr_seen = 0;
+                }
             }
             ++src;
             if (decoder->bytes_left_in_chunk == 0) {
+		decoder->last_chunk = 1;
                 if (decoder->consume_trailer) {
                     decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
                     break;
-                } else {
-                    goto Complete;
                 }
             }
             decoder->_state = CHUNKED_IN_CHUNK_DATA;
@@ -584,41 +612,58 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
             dst += decoder->bytes_left_in_chunk;
             decoder->bytes_left_in_chunk = 0;
             decoder->_state = CHUNKED_IN_CHUNK_CRLF;
+	    decoder->cr_seen = 0;
         }
         /* fallthru */
         case CHUNKED_IN_CHUNK_CRLF:
             for (;; ++src) {
                 if (src == bufsz)
                     goto Exit;
-                if (buf[src] != '\015')
+                if ((!decoder->cr_seen && buf[src] != '\015') ||
+                    (decoder->cr_seen && buf[src] != '\012')) {
+                    ret = -1;
+                    goto Exit;
+                }
+                if (decoder->cr_seen) { /* CRLF seen in the buffer */
                     break;
-            }
-            if (buf[src] != '\012') {
-                ret = -1;
-                goto Exit;
+                }
+                decoder->cr_seen = 1;
             }
             ++src;
+            if (decoder->last_chunk) {
+                goto Complete;
+            }
             decoder->_state = CHUNKED_IN_CHUNK_SIZE;
             break;
         case CHUNKED_IN_TRAILERS_LINE_HEAD:
-            for (;; ++src) {
-                if (src == bufsz)
-                    goto Exit;
-                if (buf[src] != '\015')
-                    break;
+            if (src == bufsz)
+                goto Exit;
+            decoder->cr_seen = 0;
+            if (buf[src] == '\015') {
+                decoder->_state = CHUNKED_IN_CHUNK_CRLF;
+                break;
             }
-            if (buf[src++] == '\012')
-                goto Complete;
+            ++src;
             decoder->_state = CHUNKED_IN_TRAILERS_LINE_MIDDLE;
-        /* fallthru */
+            /* fallthru */
         case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
             for (;; ++src) {
                 if (src == bufsz)
                     goto Exit;
-                if (buf[src] == '\012')
+                if (buf[src] == '\015') {
+                    decoder->cr_seen = 1;
+                } else if (buf[src] == '\012' && decoder->cr_seen) {
+                    // CRLF seen, process next line
                     break;
+                } else if ((buf[src] != '\012' && decoder->cr_seen) || (buf[src] == '\012' && !decoder->cr_seen)) {
+                    // LF must follow CR
+                    ret = -1;
+                    goto Exit;
+                } else if (decoder->cr_seen) {
+                    decoder->cr_seen = 0;
+                }
             }
-            ++src;
+            src++;
             decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
             break;
         default:

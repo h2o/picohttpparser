@@ -62,6 +62,8 @@ int phr_parse_headers(const char *buf, size_t len, struct phr_header *headers, s
 struct phr_chunked_decoder {
     size_t bytes_left_in_chunk; /* number of bytes left in current chunk */
     char consume_trailer;       /* if trailing headers should be consumed */
+    char last_chunk;            /* parsing the last chunk */
+    char cr_seen;		/* if in CHUNK_CRLF state, have we already processed CR */
     char _hex_count;
     char _state;
 };
