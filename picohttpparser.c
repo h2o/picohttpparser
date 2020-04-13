@@ -203,7 +203,6 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
         CHECK_EOF();
         if (*buf == '\015') {
             ++buf;
-            CHECK_EOF();
             EXPECT_CHAR('\012');
             ++ret_cnt;
         } else if (*buf == '\012') {
