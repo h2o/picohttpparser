@@ -217,9 +217,6 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
             return buf;
         }
     }
-
-    *ret = -2;
-    return NULL;
 }
 
 #define PARSE_INT(valp_, mul_)                                                                                                     \
