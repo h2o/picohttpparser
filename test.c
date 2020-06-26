@@ -122,6 +122,7 @@ static void test_request(void)
 
     PARSE("G\0T / HTTP/1.0\r\n\r\n", 0, -1, "NUL in method");
     PARSE("G\tT / HTTP/1.0\r\n\r\n", 0, -1, "tab in method");
+    PARSE(":GET / HTTP/1.0\r\n\r\n", 0, -1, "invalid method");
     PARSE("GET /\x7fhello HTTP/1.0\r\n\r\n", 0, -1, "DEL in uri-path");
     PARSE("GET / HTTP/1.0\r\na\0b: c\r\n\r\n", 0, -1, "NUL in header name");
     PARSE("GET / HTTP/1.0\r\nab: c\0d\r\n\r\n", 0, -1, "NUL in header value");

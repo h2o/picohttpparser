@@ -242,6 +242,40 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     } while (0)
 
 /* returned pointer is always within [buf, buf_end), or null */
+static const char *parse_http_method(const char *buf, const char *buf_end, const char **method, size_t *method_len, int *ret)
+{
+    static const char ALIGNED(16) ranges[] = "\x00 "     /* control chars and up to SP */
+                                             "\"\""      /* 0x22 */
+                                             "()"        /* 0x28,0x29 */
+                                             ",,"        /* 0x2c */
+                                             "//"        /* 0x2f */
+                                             ":@"        /* 0x3a-0x40 */
+                                             "[]"        /* 0x5b-0x5d */
+                                             "{{"        /* 0x7b */
+                                             "}}"        /* 0x7c */
+                                             "\x7f\xff"; /* DEL and beyond */
+    const char *buf_start = buf;
+    int found;
+    buf = findchar_fast(buf, buf_end, ranges, sizeof(ranges) - 1, &found);
+    if (!found) {
+        CHECK_EOF();
+    }
+    while (1) {
+        if (*buf == ' ') {
+            break;
+        } else if (!token_char_map[(unsigned char)*buf]) {
+            *ret = -1;
+            return NULL;
+        }
+        ++buf;
+        CHECK_EOF();
+    }
+    *method = buf_start;
+    *method_len = buf - buf_start;
+    return buf;
+}
+
+/* returned pointer is always within [buf, buf_end), or null */
 static const char *parse_http_version(const char *buf, const char *buf_end, int *minor_version, int *ret)
 {
     /* we want at least [HTTP/1.<two chars>] to try to parse */
@@ -352,7 +386,9 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     }
 
     /* parse request line */
-    ADVANCE_TOKEN(*method, *method_len);
+    if ((buf = parse_http_method(buf, buf_end, method, method_len, ret)) == NULL) {
+        return NULL;
+    }
     do {
         ++buf;
     } while (*buf == ' ');
