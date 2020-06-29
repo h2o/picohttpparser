@@ -245,16 +245,21 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
 static const char *parse_token(const char *buf, const char *buf_end, const char **token, size_t *token_len,
                                char next_char, int *ret)
 {
-    static const char ALIGNED(16) ranges[] = "\x00 "     /* control chars and up to SP */
-                                             "\"\""      /* 0x22 */
-                                             "()"        /* 0x28,0x29 */
-                                             ",,"        /* 0x2c */
-                                             "//"        /* 0x2f */
-                                             ":@"        /* 0x3a-0x40 */
-                                             "[]"        /* 0x5b-0x5d */
-                                             "{{"        /* 0x7b */
-                                             "}}"        /* 0x7c */
-                                             "\x7f\xff"; /* DEL and beyond */
+    /*
+     * We use a SIMD instruction that loads the list of forbidden
+     * characters into a 128-bit register. Therefore we cannot have
+     * more than 8 ranges (8*2*8=128 bits).
+     *
+     * Characters `|` and `~` are handled in the slow loop.
+     */
+    static const char ALIGNED(16) ranges[] = "\x00 "  /* control chars and up to SP */
+                                             "\"\""   /* 0x22 */
+                                             "()"     /* 0x28,0x29 */
+                                             ",,"     /* 0x2c */
+                                             "//"     /* 0x2f */
+                                             ":@"     /* 0x3a-0x40 */
+                                             "[]"     /* 0x5b-0x5d */
+                                             "{\xff"; /* 0x7b-0xff */
     const char *buf_start = buf;
     int found;
     buf = findchar_fast(buf, buf_end, ranges, sizeof(ranges) - 1, &found);
