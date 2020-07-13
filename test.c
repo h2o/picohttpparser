@@ -24,10 +24,13 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "picotest/picotest.h"
 #include "picohttpparser.h"
 
@@ -35,6 +38,8 @@ static int bufis(const char *s, size_t l, const char *t)
 {
     return strlen(t) == l && memcmp(s, t, l) == 0;
 }
+
+static char *inputbuf; /* point to the end of the buffer */
 
 static void test_request(void)
 {
@@ -48,10 +53,12 @@ static void test_request(void)
 
 #define PARSE(s, last_len, exp, comment)                                                                                           \
     do {                                                                                                                           \
+        size_t slen = sizeof(s) - 1;                                                                                               \
         note(comment);                                                                                                             \
         num_headers = sizeof(headers) / sizeof(headers[0]);                                                                        \
-        ok(phr_parse_request(s, sizeof(s) - 1, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,      \
-                             last_len) == (exp == 0 ? strlen(s) : exp));                                                           \
+        memcpy(inputbuf - slen, s, slen);                                                                                          \
+        ok(phr_parse_request(inputbuf - slen, slen, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers, \
+                             last_len) == (exp == 0 ? slen : exp));                                                                \
     } while (0)
 
     PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
@@ -162,10 +169,12 @@ static void test_response(void)
 
 #define PARSE(s, last_len, exp, comment)                                                                                           \
     do {                                                                                                                           \
+        size_t slen = sizeof(s) - 1;                                                                                               \
         note(comment);                                                                                                             \
         num_headers = sizeof(headers) / sizeof(headers[0]);                                                                        \
-        ok(phr_parse_response(s, strlen(s), &minor_version, &status, &msg, &msg_len, headers, &num_headers, last_len) ==           \
-           (exp == 0 ? strlen(s) : exp));                                                                                          \
+        memcpy(inputbuf - slen, s, slen);                                                                                          \
+        ok(phr_parse_response(inputbuf - slen, slen, &minor_version, &status, &msg, &msg_len, headers, &num_headers, last_len) ==  \
+           (exp == 0 ? slen : exp));                                                                                               \
     } while (0)
 
     PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
@@ -429,10 +438,21 @@ static void test_chunked_consume_trailer(void)
 
 int main(int argc, char **argv)
 {
+    long pagesize = sysconf(_SC_PAGESIZE);
+    assert(pagesize != 1);
+
+    inputbuf = mmap(NULL, pagesize * 3, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    assert(inputbuf != MAP_FAILED);
+    inputbuf += pagesize * 2;
+    ok(mprotect(inputbuf - pagesize, pagesize, PROT_READ | PROT_WRITE) == 0);
+
     subtest("request", test_request);
     subtest("response", test_response);
     subtest("headers", test_headers);
     subtest("chunked", test_chunked);
     subtest("chunked-consume-trailer", test_chunked_consume_trailer);
+
+    munmap(inputbuf - pagesize * 2, pagesize * 3);
+
     return done_testing();
 }
