@@ -355,10 +355,12 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     ADVANCE_TOKEN(*method, *method_len);
     do {
         ++buf;
+        CHECK_EOF();
     } while (*buf == ' ');
     ADVANCE_TOKEN(*path, *path_len);
     do {
         ++buf;
+        CHECK_EOF();
     } while (*buf == ' ');
     if (*method_len == 0 || *path_len == 0) {
         *ret = -1;
@@ -422,6 +424,7 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
     }
     do {
         ++buf;
+        CHECK_EOF();
     } while (*buf == ' ');
     /* parse status code, we want at least [:digit:][:digit:][:digit:]<other char> to try to parse */
     if (buf_end - buf < 4) {
@@ -437,7 +440,8 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
     if (*msg_len == 0) {
         /* ok */
     } else if (**msg == ' ') {
-        /* remove preceding space */
+        /* Remove preceding space. Successful return from `get_token_to_eol` guarantees that we would hit something other than SP
+         * before running past the end of the given buffer. */
         do {
             ++*msg;
             --*msg_len;
