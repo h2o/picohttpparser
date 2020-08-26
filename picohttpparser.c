@@ -320,17 +320,13 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
         if (!(*num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
             /* parsing name, but do not discard SP before colon, see
              * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
-            const char *name;
-            size_t name_len = 0;
-            if ((buf = parse_token(buf, buf_end, &name, &name_len, ':', ret)) == NULL) {
+            if ((buf = parse_token(buf, buf_end, &headers[*num_headers].name, &headers[*num_headers].name_len, ':', ret)) == NULL) {
                 return NULL;
             }
-            if (name_len == 0) {
+            if (headers[*num_headers].name_len == 0) {
                 *ret = -1;
                 return NULL;
             }
-            headers[*num_headers].name = name;
-            headers[*num_headers].name_len = name_len;
             ++buf;
             for (;; ++buf) {
                 CHECK_EOF();
