@@ -242,8 +242,8 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     } while (0)
 
 /* returned pointer is always within [buf, buf_end), or null */
-static const char *parse_token(const char *buf, const char *buf_end, const char **token, size_t *token_len,
-                               char next_char, int *ret)
+static const char *parse_token(const char *buf, const char *buf_end, const char **token, size_t *token_len, char next_char,
+                               int *ret)
 {
     /* We use pcmpestri to detect non-token characters. This instruction can take no more than eight character ranges (8*2*8=128
      * bits that is the size of a SSE register). Due to this restriction, characters `|` and `~` are handled in the slow loop. */
