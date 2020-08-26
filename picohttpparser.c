@@ -245,13 +245,8 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
 static const char *parse_token(const char *buf, const char *buf_end, const char **token, size_t *token_len,
                                char next_char, int *ret)
 {
-    /*
-     * We use a SIMD instruction that loads the list of forbidden
-     * characters into a 128-bit register. Therefore we cannot have
-     * more than 8 ranges (8*2*8=128 bits).
-     *
-     * Characters `|` and `~` are handled in the slow loop.
-     */
+    /* We use pcmpestri to detect non-token characters. This instruction can take no more than eight character ranges (8*2*8=128
+     * bits that is the size of a SSE register). Due to this restriction, characters `|` and `~` are handled in the slow loop. */
     static const char ALIGNED(16) ranges[] = "\x00 "  /* control chars and up to SP */
                                              "\"\""   /* 0x22 */
                                              "()"     /* 0x28,0x29 */
