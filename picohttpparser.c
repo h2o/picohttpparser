@@ -242,6 +242,41 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     } while (0)
 
 /* returned pointer is always within [buf, buf_end), or null */
+static const char *parse_token(const char *buf, const char *buf_end, const char **token, size_t *token_len, char next_char,
+                               int *ret)
+{
+    /* We use pcmpestri to detect non-token characters. This instruction can take no more than eight character ranges (8*2*8=128
+     * bits that is the size of a SSE register). Due to this restriction, characters `|` and `~` are handled in the slow loop. */
+    static const char ALIGNED(16) ranges[] = "\x00 "  /* control chars and up to SP */
+                                             "\"\""   /* 0x22 */
+                                             "()"     /* 0x28,0x29 */
+                                             ",,"     /* 0x2c */
+                                             "//"     /* 0x2f */
+                                             ":@"     /* 0x3a-0x40 */
+                                             "[]"     /* 0x5b-0x5d */
+                                             "{\xff"; /* 0x7b-0xff */
+    const char *buf_start = buf;
+    int found;
+    buf = findchar_fast(buf, buf_end, ranges, sizeof(ranges) - 1, &found);
+    if (!found) {
+        CHECK_EOF();
+    }
+    while (1) {
+        if (*buf == next_char) {
+            break;
+        } else if (!token_char_map[(unsigned char)*buf]) {
+            *ret = -1;
+            return NULL;
+        }
+        ++buf;
+        CHECK_EOF();
+    }
+    *token = buf_start;
+    *token_len = buf - buf_start;
+    return buf;
+}
+
+/* returned pointer is always within [buf, buf_end), or null */
 static const char *parse_http_version(const char *buf, const char *buf_end, int *minor_version, int *ret)
 {
     /* we want at least [HTTP/1.<two chars>] to try to parse */
@@ -280,31 +315,10 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
         if (!(*num_headers != 0 && (*buf == ' ' || *buf == '\t'))) {
             /* parsing name, but do not discard SP before colon, see
              * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
-            headers[*num_headers].name = buf;
-            static const char ALIGNED(16) ranges1[] = "\x00 "  /* control chars and up to SP */
-                                                      "\"\""   /* 0x22 */
-                                                      "()"     /* 0x28,0x29 */
-                                                      ",,"     /* 0x2c */
-                                                      "//"     /* 0x2f */
-                                                      ":@"     /* 0x3a-0x40 */
-                                                      "[]"     /* 0x5b-0x5d */
-                                                      "{\377"; /* 0x7b-0xff */
-            int found;
-            buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
-            if (!found) {
-                CHECK_EOF();
+            if ((buf = parse_token(buf, buf_end, &headers[*num_headers].name, &headers[*num_headers].name_len, ':', ret)) == NULL) {
+                return NULL;
             }
-            while (1) {
-                if (*buf == ':') {
-                    break;
-                } else if (!token_char_map[(unsigned char)*buf]) {
-                    *ret = -1;
-                    return NULL;
-                }
-                ++buf;
-                CHECK_EOF();
-            }
-            if ((headers[*num_headers].name_len = buf - headers[*num_headers].name) == 0) {
+            if (headers[*num_headers].name_len == 0) {
                 *ret = -1;
                 return NULL;
             }
@@ -352,7 +366,9 @@ static const char *parse_request(const char *buf, const char *buf_end, const cha
     }
 
     /* parse request line */
-    ADVANCE_TOKEN(*method, *method_len);
+    if ((buf = parse_token(buf, buf_end, method, method_len, ' ', ret)) == NULL) {
+        return NULL;
+    }
     do {
         ++buf;
         CHECK_EOF();
