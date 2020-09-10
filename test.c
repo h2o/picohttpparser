@@ -58,7 +58,7 @@ static void test_request(void)
         num_headers = sizeof(headers) / sizeof(headers[0]);                                                                        \
         memcpy(inputbuf - slen, s, slen);                                                                                          \
         ok(phr_parse_request(inputbuf - slen, slen, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers, \
-                             last_len) == (exp == 0 ? slen : exp));                                                                \
+                             last_len) == (exp == 0 ? (int)slen : exp));                                                           \
     } while (0)
 
     PARSE("GET / HTTP/1.0\r\n\r\n", 0, 0, "simple");
@@ -175,7 +175,7 @@ static void test_response(void)
         num_headers = sizeof(headers) / sizeof(headers[0]);                                                                        \
         memcpy(inputbuf - slen, s, slen);                                                                                          \
         ok(phr_parse_response(inputbuf - slen, slen, &minor_version, &status, &msg, &msg_len, headers, &num_headers, last_len) ==  \
-           (exp == 0 ? slen : exp));                                                                                               \
+           (exp == 0 ? (int)slen : exp));                                                                                          \
     } while (0)
 
     PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
@@ -273,7 +273,7 @@ static void test_headers(void)
     do {                                                                                                                           \
         note(comment);                                                                                                             \
         num_headers = sizeof(headers) / sizeof(headers[0]);                                                                        \
-        ok(phr_parse_headers(s, strlen(s), headers, &num_headers, last_len) == (exp == 0 ? strlen(s) : exp));                      \
+        ok(phr_parse_headers(s, strlen(s), headers, &num_headers, last_len) == (exp == 0 ? (int)strlen(s) : exp));                 \
     } while (0)
 
     PARSE("Host: example.com\r\nCookie: \r\n\r\n", 0, 0, "simple");
@@ -437,10 +437,10 @@ static void test_chunked_consume_trailer(void)
     }
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
     long pagesize = sysconf(_SC_PAGESIZE);
-    assert(pagesize != 1);
+    assert(pagesize >= 1);
 
     inputbuf = mmap(NULL, pagesize * 3, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     assert(inputbuf != MAP_FAILED);
