@@ -32,7 +32,7 @@ test: test-bin
 	$(PROVE) -v ./test-bin
 
 test-bin: picohttpparser.c picotest/picotest.c test.c
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) -Wall -Wextra $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
 	rm -f test-bin
