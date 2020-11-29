@@ -449,7 +449,7 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
     }
     PARSE_INT_3(status);
 
-    /* get message includig preceding space */
+    /* get message including preceding space */
     if ((buf = get_token_to_eol(buf, buf_end, msg, msg_len, ret)) == NULL) {
         return NULL;
     }
