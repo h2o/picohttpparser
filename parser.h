@@ -27,7 +27,8 @@
 #ifndef picohttpparser_h
 #define picohttpparser_h
 
-#include <sys/types.h>
+#include <memory.h>
+#include <inttypes.h>
 
 #ifdef _MSC_VER
 #define ssize_t intptr_t
@@ -104,6 +105,18 @@ static inline uint64_t string_as_uint64(const char *s)
 
 #pragma endregion
 
+typedef enum {
+    M_DELETE = 0,
+    M_GET,
+    M_HEAD,
+    M_POST,
+    M_PUT,
+    M_CONNECT,
+    M_OPTIONS,
+    M_TRACE,
+    M_UNKNOWN
+} http_method_t;
+
 /* contains name and value of a header (name == NULL if is a continuing line
  * of a multiline header */
 struct phr_header {
@@ -114,9 +127,9 @@ struct phr_header {
 };
 
 typedef struct phr_request_cb {
-    int (*on_path)(const char *, size_t);
-    int (*on_header)(const char *, size_t, const char *, size_t);
-    int (*on_body_part)(const char *, size_t);
+    int (*on_path)(void*, const char *, size_t);
+    int (*on_header)(void*, const char *, size_t, const char *, size_t);
+    int (*on_body_part)(void*, const char *, size_t);
 } phr_request_cb_t;
 
 typedef struct phr_request {
@@ -125,16 +138,17 @@ typedef struct phr_request {
     int8_t    major_version;
     int8_t    minor_version;
     union {
-        int8_t flags;
+        uint8_t flags;
         struct {
-            int8_t is_chunked: 1;
-            int8_t is_upgrade: 1;
-            int8_t is_keep_alive: 1;
-            int8_t is_close: 1;
-            int8_t is_done: 1;
-            int8_t _u3: 3;
+            uint8_t is_chunked: 1;
+            uint8_t is_upgrade: 1;
+            uint8_t is_keep_alive: 1;
+            uint8_t is_close: 1;
+            uint8_t is_done: 1;
+            uint8_t _u3: 3;
         };
     };
+    void* cbp;
 } phr_request_t;
 
 /* returns number of bytes consumed if successful, -2 if request is partial,
@@ -143,12 +157,13 @@ int phr_parse_request(
     const char *buf,
     size_t len,
     phr_request_t* req,
-    phr_request_cb_t* cb);
+    const phr_request_cb_t* cb,
+    size_t last_len);
 
 typedef struct phr_response_cb {
-    void (*on_status)(const char *, size_t);
-    void (*on_header)(const char *, size_t, const char* size_t);
-    void (*on_body_part)(const char *, size_t);
+    int (*on_status)(void*,    const char *, size_t);
+    int (*on_header)(void *,   const char *, size_t, const char*, size_t);
+    int (*on_body_part)(void*, const char *, size_t);
 } phr_response_cb_t;
 
 typedef struct phr_response {
@@ -157,30 +172,33 @@ typedef struct phr_response {
     int8_t    major_version;
     int8_t    minor_version;
     union {
-        int8_t flags;
+        uint8_t flags;
         struct {
-            int8_t is_chunked: 1;
-            int8_t is_keep_alive: 1;
-            int8_t is_close: 1;
-            int8_t is_done: 1;
-            int8_t _u3: 4;
+            uint8_t is_chunked: 1;
+            uint8_t is_keep_alive: 1;
+            uint8_t is_close: 1;
+            uint8_t is_done: 1;
+            uint8_t is_upgrade: 1;
+            uint8_t _u3: 3;
         };
     };
+    void* cbp;
 } phr_response_t;
 
 /* ditto */
 int phr_parse_response(
-    const char *_buf,
+    const char *buf,
     size_t len,
     phr_response_t* resp,
-    phr_response_cb_t* cb,
+    const phr_response_cb_t* cb,
     size_t last_len);
 
 /* ditto */
 int phr_parse_headers(
     const char *buf,
     size_t len,
-    void(*on_header)(const char*, size_t, const char* size_t),
+    void* data,
+    int(*on_header)(void*, const char*, size_t, const char*, size_t),
     size_t last_len);
 
 /* should be zero-filled before start */

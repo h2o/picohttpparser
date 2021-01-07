@@ -39,7 +39,7 @@
 #include <x86intrin.h>
 #endif
 #endif
-#include "picohttpparser.h"
+#include "parser.h"
 
 #if __GNUC__ >= 3
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -308,10 +308,10 @@ static const char *parse_http_version(const char *buf, const char *buf_end, int 
 static const char *parse_headers(
     const char *buf,
     const char *buf_end,
-    phr_request_t *req,
-    phr_request_cb_t *cb,
-    int(*on_header)(void*,
-                     int(const char*, size_t, const char*, size_t),
+    void *data,
+    int(*on_header)(void*, const char*, size_t, const char*, size_t),
+    int(*on_header_p)(void*,
+                     int(void*, const char*, size_t, const char*, size_t),
                      const char*, size_t, const char*, size_t),
     size_t max_headers,
     int *ret)
@@ -368,91 +368,138 @@ static const char *parse_headers(
                 break;
             }
         }
-        on_header(req, cb->on_header, name, len, value, value_end - value);
+        *ret = on_header_p(data, on_header, name, len, value, value_end - value);
+        if (*ret != 0) {
+            return NULL;
+        }
     }
+
     return buf;
 }
 
-static void parse_connection_header(
+#define parse_connection_header_block(xx) \
+    if (unlikely(len != sizeof("Connection")-1)) { \
+        return; \
+    } \
+    else { \
+        if (unlikely(LOWER8(string_as_uint64(name+2)) != STR8_INT_L('n', 'n', 'e', 'c', 't', 'i', 'o', 'n'))) { \
+            return; \
+        } \
+    } \
+     \
+    if (unlikely(value_len < sizeof("close")-1)) { \
+        return; \
+    } \
+    const char* end = value + value_len; \
+    for (const char *p = value; p+4 < end;) { \
+        switch (LOWER4(string_as_uint32(p))) { \
+            case STR4_INT_L('c', 'l', 'o', 's'): \
+                (xx)->is_close = (value_len >= 5 && toupper(p[4]) == 'E')? 1 : 0; \
+                p += sizeof("close")-1; \
+                break; \
+            case STR4_INT_L('u', 'p', 'g', 'r'): \
+            case STR4_INT_L(' ', 'u', 'p', 'g'): \
+                (xx)->is_upgrade = 1; \
+                p += sizeof("upgrade")-1; \
+                break; \
+            case STR4_INT_L('k', 'e', 'e', 'p'): \
+            case STR4_INT_L(' ', 'k', 'e', 'e'): \
+                (xx)->is_keep_alive = 1; \
+                p += sizeof("keep-alive")-1; \
+                break; \
+            default: \
+                return; \
+        } \
+         \
+        if (p == end) break; \
+        while(*p == ' ') p++; \
+        if (*p++ != ',') break; \
+        while(p < end && *p == ' ') p++; \
+    } \
+
+static void parse_req_connection_header(
     phr_request_t *req,
     const char* name,
     size_t len,
     const char *value, size_t value_len)
 {
-    if (unlikely(len != sizeof("Connection"))) {
-        return;
-    }
-    else {
-        if (unlikely(LOWER8(string_as_uint32(name+2)) != STR8_INT_L('n', 'n', 'e', 'c', 't', 'i', 'o', 'n'))) {
-            return;
-        }
-    }
-
-    if (unlikely(value_len < sizeof("close")-1)) {
-        return;
-    }
-    for (const char *p = value; p < value+len; p++) {
-        switch (LOWER4(string_as_uint32(value))) {
-            case STR4_INT_L('c', 'l', 'o', 's'):
-                req->is_close = value_len == 5 && toupper(value[4]) == 'E';
-                break;
-            case STR4_INT_L('u', 'p', 'g', 'r'):
-            case STR4_INT_L(' ', 'u', 'p', 'g'):
-                req->is_upgrade = 1;
-                break;
-            case STR4_INT_L('k', 'e', 'e', 'p'):
-            case STR4_INT_L(' ', 'k', 'e', 'e'):
-                req->is_keep_alive = 1;
-                break;
-            default:
-                break;
-        }
-        if (!(p = strchr(p, ',')))
-            break;
-    }
+    parse_connection_header_block(req)
 }
+
+static void parse_resp_connection_header(
+    phr_response_t *resp,
+    const char* name,
+    size_t len,
+    const char *value, size_t value_len)
+{
+    parse_connection_header_block(resp)
+}
+
+#undef parse_connection_header_block
+
+#define parse_on_general_header(tp, xx) \
+    tp * xx = (tp *) data;              \
+    if (name_len > 5) {                \
+    switch (LOWER4(string_as_uint32(name))) { \
+        case STR4_INT_L('C', 'o', 'n', 'n'):  \
+            parse_##xx##_connection_header(xx, name, name_len, value, value_len); \
+            break; \
+        case STR4_INT_L('C', 'o', 'n', 't'): { \
+            const char *p = name + sizeof("Conten") - 1; \
+            if (name_len == 14 && LOWER8(string_as_uint64(p)) == STR8_INT_L('t', '-', 'L', 'e', 'n', 'g', 't', 'h')) { \
+                errno = 0; \
+                char *ep = NULL;                        \
+                xx->content_length = strtol(value, &ep, 0); \
+                if (errno != 0 || (ep - value) != value_len ) { \
+                    xx->content_length = -1; \
+                    return -1; \
+                } \
+            } \
+            break; \
+        default: \
+            break; \
+        } \
+    }                                   \
+    }
 
 static int parse_request_on_header(
     void *data,
-    int (*on_header)(const char*, size_t, const char*, size_t),
+    int (*on_header)(void*, const char*, size_t, const char*, size_t),
+    const char* name, size_t name_len,
+    const char* value, size_t value_len)
+
+{
+    parse_on_general_header(phr_request_t, req);
+    if (on_header)
+        return on_header(req->cbp, name, name_len, value, value_len);
+    return 0;
+}
+
+static int parse_response_on_header(
+    void *data,
+    int (*on_header)(void*, const char*, size_t, const char*, size_t),
     const char* name, size_t name_len,
     const char* value, size_t value_len)
 {
-    phr_request_t *req = (phr_request_t *) data;
-    switch (LOWER4(string_as_uint32(name))) {
-        case STR4_INT_L('C', 'o', 'n', 'n'):
-            parse_connection_header(req, name, name_len, value, value_len);
-            break;
-        case STR4_INT_L('C', 'o', 'n','t'):{
-            const char* p = name+sizeof("Content")-1;
-            if (LOWER4(string_as_uint32(p)) == STR4_INT_L('-', 'L', 'e', 'n')) {
-                errno = 0;
-                req->content_length = strtol(value, NULL, 0);
-                if (errno != 0) {
-                    req->content_length = -1;
-                    return -1;
-                }
-            }
-            break;
-        default:
-            break;
-        }
-    }
-    return on_header(name, name_len, value, value_len);
+    parse_on_general_header(phr_response_t, resp);
+
+    if (on_header)
+        return on_header(resp->cbp, name, name_len, value, value_len);
+    return 0;
 }
 
+static int parse_untied_on_header(
+    void *data,
+    int (*on_header)(void*, const char*, size_t, const char*, size_t),
+    const char* name, size_t name_len,
+    const char* value, size_t value_len)
+{
+    if (on_header)
+        return on_header(data, name, name_len, value, value_len);
+    return 0;
+}
 
-enum {
-    M_DELETE = 0,
-    M_GET,
-    M_HEAD,
-    M_POST,
-    M_PUT,
-    M_CONNECT,
-    M_OPTIONS,
-    M_TRACE,
-    M_UNKNOWN
-};
+#undef  parse_on_general_header
 
 int parse_method(const char* method, size_t len)
 {
@@ -486,7 +533,7 @@ static const char *parse_request(
     const char *buf,
     const char *buf_end,
     phr_request_t *req,
-    phr_request_cb_t *cb,
+    const phr_request_cb_t *cb,
     size_t max_headers,
     int *ret)
 {
@@ -518,23 +565,24 @@ static const char *parse_request(
     } while (*buf == ' ');
 
     ADVANCE_TOKEN(value, len);
-    do {
-        ++buf;
-        CHECK_EOF();
-    } while (*buf == ' ');
-
     if (len == 0) {
         *ret = -1;
         return NULL;
     }
 
-    *ret = cb->on_path(value, len);
+    *ret = cb->on_path(req->cbp, value, len);
     if (*ret != 0) {
         return NULL;
     }
 
+    do {
+        ++buf;
+        CHECK_EOF();
+    } while (*buf == ' ');
+
     int minor_ver;
     if ((buf = parse_http_version(buf, buf_end, &minor_ver, ret)) == NULL) {
+        req->minor_version = -1;
         return NULL;
     }
     req->minor_version = (int8_t)(minor_ver);
@@ -553,46 +601,52 @@ static const char *parse_request(
         buf,
         buf_end,
         req,
+        cb->on_header,
         parse_request_on_header,
         max_headers,
         ret);
 }
 
-int phr_parse_request(const char *buf_start, size_t len, const char **method, size_t *method_len, const char **path,
-                      size_t *path_len, int *minor_version, struct phr_header *headers, size_t *num_headers, size_t last_len)
+int phr_parse_request(
+    const char *buf,
+    size_t len,
+    phr_request_t* req,
+    const phr_request_cb_t* cb,
+    size_t last_len)
 {
-    const char *buf = buf_start, *buf_end = buf_start + len;
-    size_t max_headers = *num_headers;
+    const char *buf_start = buf, *buf_end = buf + len;
+    size_t max_headers = 127;
     int r;
 
-    *method = NULL;
-    *method_len = 0;
-    *path = NULL;
-    *path_len = 0;
-    *minor_version = -1;
-    *num_headers = 0;
-
     /* if last_len != 0, check if the request is complete (a fast countermeasure
-       againt slowloris */
+       against slowloris */
     if (last_len != 0 && is_complete(buf, buf_end, last_len, &r) == NULL) {
         return r;
     }
 
-    if ((buf = parse_request(buf, buf_end, method, method_len, path, path_len, minor_version, headers, num_headers, max_headers,
-                             &r)) == NULL) {
+    buf = parse_request(
+                buf, buf_end, req, cb, max_headers, &r);
+    if (buf == NULL) {
         return r;
     }
 
     return (int)(buf - buf_start);
 }
 
-static const char *parse_response(const char *buf, const char *buf_end, int *minor_version, int *status, const char **msg,
-                                  size_t *msg_len, struct phr_header *headers, size_t *num_headers, size_t max_headers, int *ret)
+static const char *parse_response(
+    const char *buf,
+    const char *buf_end,
+    phr_response_t *resp,
+    const phr_response_cb_t *cb,
+    int max_headers,
+    int *ret)
 {
     /* parse "HTTP/1.x" */
-    if ((buf = parse_http_version(buf, buf_end, minor_version, ret)) == NULL) {
+    int minor = 0;
+    if ((buf = parse_http_version(buf, buf_end, &minor, ret)) == NULL) {
         return NULL;
     }
+    resp->minor_version = (int8_t) minor;
     /* skip space */
     if (*buf != ' ') {
         *ret = -1;
@@ -607,42 +661,50 @@ static const char *parse_response(const char *buf, const char *buf_end, int *min
         *ret = -2;
         return NULL;
     }
-    PARSE_INT_3(status);
+    PARSE_INT_3(&resp->status);
 
     /* get message including preceding space */
-    if ((buf = get_token_to_eol(buf, buf_end, msg, msg_len, ret)) == NULL) {
+    const char *tok;
+    size_t tok_len;
+    if ((buf = get_token_to_eol(buf, buf_end, &tok, &tok_len, ret)) == NULL) {
         return NULL;
     }
-    if (*msg_len == 0) {
+    if (tok_len == 0) {
         /* ok */
-    } else if (**msg == ' ') {
+    } else if (*tok == ' ') {
         /* Remove preceding space. Successful return from `get_token_to_eol` guarantees that we would hit something other than SP
          * before running past the end of the given buffer. */
         do {
-            ++*msg;
-            --*msg_len;
-        } while (**msg == ' ');
+            ++tok;
+            --tok_len;
+        } while (*tok == ' ');
     } else {
         /* garbage found after status code */
         *ret = -1;
         return NULL;
     }
 
-    return parse_headers(buf, buf_end, headers, num_headers, max_headers, ret);
+    if (likely(cb->on_status)) {
+        *ret = cb->on_status(resp->cbp, tok, tok_len);
+        if (unlikely(*ret != 0)) {
+            return NULL;
+        }
+    }
+
+    return parse_headers(
+        buf, buf_end, resp, cb->on_header, parse_response_on_header, max_headers, ret);
 }
 
-int phr_parse_response(const char *buf_start, size_t len, int *minor_version, int *status, const char **msg, size_t *msg_len,
-                       struct phr_header *headers, size_t *num_headers, size_t last_len)
+int phr_parse_response(
+    const char *buf,
+    size_t len,
+    phr_response_t* resp,
+    const phr_response_cb_t* cb,
+    size_t last_len)
 {
-    const char *buf = buf_start, *buf_end = buf + len;
-    size_t max_headers = *num_headers;
+    const char *buf_start = buf, *buf_end = buf + len;
+    size_t max_headers = 127;
     int r;
-
-    *minor_version = -1;
-    *status = 0;
-    *msg = NULL;
-    *msg_len = 0;
-    *num_headers = 0;
 
     /* if last_len != 0, check if the response is complete (a fast countermeasure
        against slowloris */
@@ -650,20 +712,24 @@ int phr_parse_response(const char *buf_start, size_t len, int *minor_version, in
         return r;
     }
 
-    if ((buf = parse_response(buf, buf_end, minor_version, status, msg, msg_len, headers, num_headers, max_headers, &r)) == NULL) {
+    if ((buf = parse_response(
+                buf, buf_end, resp, cb, max_headers, &r)) == NULL) {
         return r;
     }
 
     return (int)(buf - buf_start);
 }
 
-int phr_parse_headers(const char *buf_start, size_t len, struct phr_header *headers, size_t *num_headers, size_t last_len)
+int phr_parse_headers(
+    const char *buf,
+    size_t len,
+    void *data,
+    int(*on_header)(void* data, const char*, size_t, const char*, size_t),
+    size_t last_len)
 {
-    const char *buf = buf_start, *buf_end = buf + len;
-    size_t max_headers = *num_headers;
+    const char *buf_start = buf, *buf_end = buf + len;
+    size_t max_headers = 127;
     int r;
-
-    *num_headers = 0;
 
     /* if last_len != 0, check if the response is complete (a fast countermeasure
        against slowloris */
@@ -671,7 +737,7 @@ int phr_parse_headers(const char *buf_start, size_t len, struct phr_header *head
         return r;
     }
 
-    if ((buf = parse_headers(buf, buf_end, headers, num_headers, max_headers, &r)) == NULL) {
+    if ((buf = parse_headers(buf, buf_end, data, on_header, parse_untied_on_header, max_headers, &r)) == NULL) {
         return r;
     }
 

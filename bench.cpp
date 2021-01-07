@@ -26,7 +26,7 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include "picohttpparser.h"
+#include "parser.hpp"
 
 #define REQ                                                                                                                        \
     "GET /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg HTTP/1.1\r\n"                                                \
@@ -44,21 +44,15 @@
     "__utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral\r\n"             \
     "\r\n"
 
+using namespace picohttp;
+
 int main(void)
 {
-    const char *method;
-    size_t method_len;
-    const char *path;
-    size_t path_len;
-    int minor_version;
-    struct phr_header headers[32];
-    size_t num_headers;
     int i, ret;
-
-    for (i = 0; i < 10000000; i++) {
-        num_headers = sizeof(headers) / sizeof(headers[0]);
-        ret = phr_parse_request(REQ, sizeof(REQ) - 1, &method, &method_len, &path, &path_len, &minor_version, headers, &num_headers,
-                                0);
+    DefaultRequestParser parser;
+    RequestParserCb cb(parser);
+    for (i = 0; i < 100000; i++) {
+        ret = phr_parse_request(REQ, sizeof(REQ) - 1, &parser, &RequestParserCb::Instance, 0);
         assert(ret == sizeof(REQ) - 1);
     }
 
