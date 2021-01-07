@@ -1,0 +1,41 @@
+name: Dev Build
+
+on:
+  pull_request:
+    branches:
+      - master
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: suilteam/base:alpine
+
+    steps:
+      - uses: actions/checkout@v2
+      # Create a build directory
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{runner.workspace}}/build
+
+      # Configure CMake project
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cd ${{runner.workspace}}/build
+          cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      # Build project
+      - name: Build
+        shell: bash
+        run: |
+          cd ${{runner.workspace}}/build
+          make -j4
+          ./picohttp-test -r junit -o picohttpparser.xml
+      - name: Cached Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: unit-test-binaries
+          path: ${{runner.workspace}}/build/**/picohttpparser.xml
+          retention-days: 1
