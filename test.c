@@ -437,6 +437,25 @@ static void test_chunked_consume_trailer(void)
     }
 }
 
+static void test_chunked_leftdata(void)
+{
+#define NEXT_REQ "GET / HTTP/1.1\r\n\r\n"
+
+    struct phr_chunked_decoder dec = {0};
+    dec.consume_trailer = 1;
+    char buf[] = "5\r\nabcde\r\n0\r\n\r\n" NEXT_REQ;
+    size_t bufsz = sizeof(buf) - 1;
+
+    ssize_t ret = phr_decode_chunked(&dec, buf, &bufsz);
+    ok(ret >= 0);
+    ok(bufsz == 5);
+    ok(memcmp(buf, "abcde", 5) == 0);
+    ok(ret == sizeof(NEXT_REQ) - 1);
+    ok(memcmp(buf + bufsz, NEXT_REQ, sizeof(NEXT_REQ) - 1) == 0);
+
+#undef NEXT_REQ
+}
+
 int main(void)
 {
     long pagesize = sysconf(_SC_PAGESIZE);
@@ -452,6 +471,7 @@ int main(void)
     subtest("headers", test_headers);
     subtest("chunked", test_chunked);
     subtest("chunked-consume-trailer", test_chunked_consume_trailer);
+    subtest("chunked-leftdata", test_chunked_leftdata);
 
     munmap(inputbuf - pagesize * 2, pagesize * 3);
 
