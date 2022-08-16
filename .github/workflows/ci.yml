@@ -18,5 +18,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
     - name: make test
       run: make test CC=${{ matrix.cc }}
