@@ -18,5 +18,5 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: make check
-      run: make check CC=${{ matrix.cc }}
+    - name: make test
+      run: make test CC=${{ matrix.cc }}
