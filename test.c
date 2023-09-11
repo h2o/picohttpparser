@@ -410,6 +410,7 @@ static void test_chunked(void)
         chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
+        chunked_test_runners[i](__LINE__, 0, "6 ; comment\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n", "hello world",
                                 sizeof("a: b\r\nc: d\r\n\r\n") - 1);
         chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world", 0);
@@ -421,6 +422,7 @@ static void test_chunked(void)
         test_chunked_failure(__LINE__, "6\r\nhello \r\nffffffffffffffff\r\nabcdefg", -2);
         test_chunked_failure(__LINE__, "6\r\nhello \r\nfffffffffffffffff\r\nabcdefg", -1);
     }
+    test_chunked_failure(__LINE__, "1x\r\na\r\n0\r\n", -1);
 }
 
 static void test_chunked_consume_trailer(void)
