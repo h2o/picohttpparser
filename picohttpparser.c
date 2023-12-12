@@ -557,6 +557,18 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
                         ret = -1;
                         goto Exit;
                     }
+                    /* the only characters that may appear after the chunk size are BWS, semicolon, or CRLF */
+                    switch (buf[src]) {
+                    case ' ':
+                    case '\011':
+                    case ';':
+                    case '\012':
+                    case '\015':
+                        break;
+                    default:
+                        ret = -1;
+                        goto Exit;
+                    }
                     break;
                 }
                 if (decoder->_hex_count == sizeof(size_t) * 2) {
