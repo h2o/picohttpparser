@@ -299,6 +299,10 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
                                  size_t max_headers, int *ret)
 {
     for (;; ++*num_headers) {
+        const char *value;
+        size_t value_len;
+        const char *value_end;
+
         CHECK_EOF();
         if (*buf == '\015') {
             ++buf;
@@ -333,13 +337,12 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
             headers[*num_headers].name = NULL;
             headers[*num_headers].name_len = 0;
         }
-        const char *value;
-        size_t value_len;
+
         if ((buf = get_token_to_eol(buf, buf_end, &value, &value_len, ret)) == NULL) {
             return NULL;
         }
         /* remove trailing SPs and HTABs */
-        const char *value_end = value + value_len;
+        value_end = value + value_len;
         for (; value_end != value; --value_end) {
             const char c = *(value_end - 1);
             if (!(c == ' ' || c == '\t')) {
