@@ -1,10 +1,5 @@
-#include <stdlib.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "picohttpparser.h"
-#include "picotest.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (size < 10) {
