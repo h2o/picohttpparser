@@ -24,7 +24,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <assert.h>
 #include <stddef.h>
 #include <string.h>
 #ifdef __SSE4_2__
@@ -112,7 +111,7 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
         size_t left = (buf_end - buf) & ~15;
         do {
             __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
-            int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
+            int r = _mm_cmpestri(ranges16, (int)ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
             if (unlikely(r != 16)) {
                 buf += r;
                 *found = 1;
@@ -655,8 +654,6 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
             ++src;
             decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
             break;
-        default:
-            assert(!"decoder is corrupt");
         }
     }
 
