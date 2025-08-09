@@ -34,6 +34,12 @@
 #include <x86intrin.h>
 #endif
 #endif
+#ifdef __ARM_FEATURE_SVE
+#include <arm_sve.h>
+#endif
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
 #include "picohttpparser.h"
 
 #if __GNUC__ >= 3
@@ -71,9 +77,8 @@
 #define ADVANCE_TOKEN(tok, toklen)                                                                                                 \
     do {                                                                                                                           \
         const char *tok_start = buf;                                                                                               \
-        static const char ALIGNED(16) ranges2[16] = "\000\040\177\177";                                                            \
         int found2;                                                                                                                \
-        buf = findchar_fast(buf, buf_end, ranges2, 4, &found2);                                                                    \
+        buf = findchar_nonprintable_fast(buf, buf_end, &found2);                                                                   \
         if (!found2) {                                                                                                             \
             CHECK_EOF();                                                                                                           \
         }                                                                                                                          \
@@ -131,6 +136,66 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
     return buf;
 }
 
+static const char *findchar_nonprintable_fast(const char *buf, const char *buf_end, int *found)
+{
+#ifdef __ARM_FEATURE_SVE
+    *found = 0;
+
+    for (uint64_t i = 0;; i = svqincb(i, 1)) {
+        const uint64_t len = buf_end - buf;
+        const svbool_t pg = svwhilelt_b8(i, len);
+
+        if (!svptest_first(svptrue_b8(), pg)) {
+            buf = buf_end;
+            break;
+        }
+
+        const svuint8_t v = svld1(pg, (const uint8_t *)buf + i);
+        svbool_t c = svcmplt(pg, v, '\041');
+
+        c = svorr_z(pg, c, svcmpeq(pg, v, '\177'));
+
+        if (svptest_any(pg, c)) {
+            *found = 1;
+            c = svbrkb_z(pg, c);
+            buf += i + svcntp_b8(pg, c);
+            break;
+        }
+    }
+
+    return buf;
+#elif defined(__ARM_NEON) && defined(__ARM_64BIT_STATE)
+    *found = 0;
+
+    const size_t block_size = sizeof(uint8x16_t) - 1;
+    const char *const end = (size_t)(buf_end - buf) >= block_size ? buf_end - block_size : buf;
+
+    for (; buf < end; buf += sizeof(uint8x16_t)) {
+        uint8x16_t v = vld1q_u8((const uint8_t *)buf);
+
+        v = vorrq_u8(vcltq_u8(v, vmovq_n_u8('\041')), vceqq_u8(v, vmovq_n_u8('\177')));
+
+        /* Pack the comparison result into 64 bits. */
+        const uint8x8_t rv = vshrn_n_u16(vreinterpretq_u16_u8(v), 4);
+        uint64_t offset = vget_lane_u64(vreinterpret_u64_u8(rv), 0);
+
+        if (offset) {
+            *found = 1;
+            static_assert(sizeof(unsigned long long) == sizeof(uint64_t), "Need the number of leading 0-bits in uint64_t.");
+            /* offset uses 4 bits per byte of input. */
+            buf += __builtin_ctzll(offset) / 4;
+            break;
+        }
+    }
+
+    return buf;
+#else
+    static const char ALIGNED(16) ranges2[16] = "\000\040\177\177";
+
+    return findchar_fast(buf, buf_end, ranges2, 4, found);
+#endif
+}
+
 static const char *get_token_to_eol(const char *buf, const char *buf_end, const char **token, size_t *token_len, int *ret)
 {
     const char *token_start = buf;
@@ -143,6 +208,80 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
     buf = findchar_fast(buf, buf_end, ranges1, 6, &found);
     if (found)
         goto FOUND_CTL;
+#elif defined(__ARM_FEATURE_SVE)
+    for (uint64_t i = 0;; i = svqincb(i, 1)) {
+        const uint64_t len = buf_end - buf;
+        const svbool_t pg = svwhilelt_b8(i, len);
+
+        if (!svptest_first(svptrue_b8(), pg)) {
+            buf = buf_end;
+            break;
+        }
+
+        const svuint8_t v = svld1(pg, (const uint8_t *)buf + i);
+        const uint8_t space = '\040';
+        svbool_t c = svcmpge(pg, svsub_x(pg, v, space), 0137u);
+
+        if (svptest_any(pg, c)) {
+            c = svcmplt(pg, v, space);
+            c = svcmpne(c, v, '\011');
+            c = svorr_z(pg, c, svcmpeq(pg, v, '\177'));
+
+            if (svptest_any(pg, c)) {
+                c = svbrkb_z(pg, c);
+                buf += i + svcntp_b8(pg, c);
+                goto FOUND_CTL;
+            }
+        }
+    }
+#elif defined(__ARM_NEON) && defined(__ARM_64BIT_STATE)
+    const size_t block_size = 2 * sizeof(uint8x16_t) - 1;
+    const char *const end = (size_t)(buf_end - buf) >= block_size ? buf_end - block_size : buf;
+
+    for (; buf < end; buf += 2 * sizeof(uint8x16_t)) {
+        const uint8x16_t space = vmovq_n_u8('\040');
+        const uint8x16_t threshold = vmovq_n_u8(0137u);
+        const uint8x16_t v1 = vld1q_u8((const uint8_t *)buf);
+        const uint8x16_t v2 = vld1q_u8((const uint8_t *)buf + sizeof(v1));
+        uint8x16_t v3 = vsubq_u8(v1, space);
+        uint8x16_t v4 = vsubq_u8(v2, space);
+
+        v3 = vcgeq_u8(v3, threshold);
+        v4 = vcgeq_u8(v4, threshold);
+        v3 = vorrq_u8(v3, v4);
+        /* Pack the comparison result into half a vector, i.e. 64 bits. */
+        v3 = vpmaxq_u8(v3, v3);
+
+        if (vgetq_lane_u64(vreinterpretq_u64_u8(v3), 0)) {
+            const uint8x16_t del = vmovq_n_u8('\177');
+            /* This mask makes it possible to pack the comparison results into half a vector,
+             * which has the same size as uint64_t. */
+            const uint8x16_t mask = vreinterpretq_u8_u32(vmovq_n_u32(0x40100401));
+            const uint8x16_t tab = vmovq_n_u8('\011');
+
+            v3 = vcltq_u8(v1, space);
+            v4 = vcltq_u8(v2, space);
+            v3 = vbicq_u8(v3, vceqq_u8(v1, tab));
+            v4 = vbicq_u8(v4, vceqq_u8(v2, tab));
+            v3 = vorrq_u8(v3, vceqq_u8(v1, del));
+            v4 = vorrq_u8(v4, vceqq_u8(v2, del));
+            /* After masking, four consecutive bytes in the results do not have the same bits set. */
+            v3 = vandq_u8(v3, mask);
+            v4 = vandq_u8(v4, mask);
+            /* Pack the comparison results into 128, and then 64 bits. */
+            v3 = vpaddq_u8(v3, v4);
+            v3 = vpaddq_u8(v3, v3);
+
+            uint64_t offset = vgetq_lane_u64(vreinterpretq_u64_u8(v3), 0);
+
+            if (offset) {
+                static_assert(sizeof(unsigned long long) == sizeof(uint64_t), "Need the number of leading 0-bits in uint64_t.");
+                /* offset uses 2 bits per byte of input. */
+                buf += __builtin_ctzll(offset) / 2;
+                goto FOUND_CTL;
+            }
+        }
+    }
 #else
     /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
     while (likely(buf_end - buf >= 8)) {
