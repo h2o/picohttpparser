@@ -1,9 +1,9 @@
-name: Release
+name: Release Reltest
 
 on:
   push:
     branches:
-    - master
+    - kazuho/reltest/master
   workflow_dispatch:
 
 permissions:
@@ -23,9 +23,9 @@ jobs:
     - name: Run release automation
       run: |
         misc/release.sh \
-          --source-branch master \
-          --release-branch release \
-          --tag-prefix v1. \
+          --source-branch kazuho/reltest/master \
+          --release-branch kazuho/reltest/release \
+          --tag-prefix vtest1. \
           --remote origin \
           --author-name "Kazuho Oku" \
           --author-email "kazuhooku+github-actions@gmail.com" \
