@@ -33,13 +33,10 @@ all:
 test: test-bin
 	env $(TEST_ENV) $(PROVE) -v ./test-bin
 
-test-release:
-	./misc/test-release.sh
-
 test-bin: picohttpparser.c picotest/picotest.c test.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
 	rm -f test-bin
 
-.PHONY: test test-release
+.PHONY: test
