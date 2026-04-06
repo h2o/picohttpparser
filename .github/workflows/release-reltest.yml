@@ -22,7 +22,7 @@ jobs:
 
     - name: Run release automation
       run: |
-        misc/release.sh \
+        misc/release.rb \
           --source-branch kazuho/reltest/master \
           --release-branch kazuho/reltest/release \
           --tag-prefix vtest1. \

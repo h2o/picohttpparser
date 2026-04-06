@@ -22,7 +22,7 @@ jobs:
 
     - name: Run release automation
       run: |
-        misc/release.sh \
+        misc/release.rb \
           --source-branch master \
           --release-branch release \
           --tag-prefix v1. \
