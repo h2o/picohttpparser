@@ -37,11 +37,19 @@
 #include "picohttpparser.h"
 
 #if __GNUC__ >= 3
+#ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
+#endif
+#ifndef unlikely
 #define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
 #else
+#ifndef likely
 #define likely(x) (x)
+#endif
+#ifndef unlikely
 #define unlikely(x) (x)
+#endif
 #endif
 
 #ifdef _MSC_VER
