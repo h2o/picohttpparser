@@ -152,7 +152,8 @@ if [ "$release_created" -eq 0 ] && git merge-base --is-ancestor "$source_ref" HE
 fi
 
 if [ "$release_created" -eq 0 ]; then
-    git merge --no-ff -X theirs --no-edit "$source_ref"
+    git -c user.name="$author_name" -c user.email="$author_email" \
+        merge --no-ff -X theirs --no-edit "$source_ref"
 fi
 
 tmp_header=$(mktemp "${TMPDIR:-/tmp}/picohttpparser-header.XXXXXX")
