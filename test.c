@@ -477,7 +477,7 @@ static ssize_t do_test_chunked_overhead(size_t chunk_len, size_t chunk_count, co
 
     for (size_t i = 0; i < chunk_count; ++i) {
         /* build and feed the chunk header */
-        bufsz = (size_t)sprintf(buf, "%zx%s\r\n", chunk_len, extra);
+        bufsz = (size_t)snprintf(buf, sizeof(buf), "%zx%s\r\n", chunk_len, extra);
         if ((ret = phr_decode_chunked(&dec, buf, &bufsz)) != -2)
             goto Exit;
         assert(bufsz == 0);
