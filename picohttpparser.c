@@ -691,7 +691,7 @@ Exit:
     /* if incomplete but the overhead of the chunked encoding is >=100KB and >80%, signal an error */
     if (ret == -2) {
         decoder->_total_overhead += bufsz - dst;
-        if (decoder->_total_overhead >= 100UL * 1024 && decoder->_total_read - decoder->_total_overhead < decoder->_total_read / 4)
+        if (decoder->_total_overhead >= 102400 && decoder->_total_read - decoder->_total_overhead < decoder->_total_read / 4)
             ret = -1;
     }
     return ret;
