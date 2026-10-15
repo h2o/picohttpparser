@@ -25,7 +25,7 @@
 
 CC?=gcc
 PROVE?=prove
-CFLAGS=-Wall -fsanitize=address,undefined
+TEST_CFLAGS=$(CFLAGS) -Wall -fsanitize=address,undefined
 TEST_ENV="UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1"
 
 all:
@@ -34,9 +34,11 @@ test: test-bin
 	env $(TEST_ENV) $(PROVE) -v ./test-bin
 
 test-bin: picohttpparser.c picotest/picotest.c test.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(TEST_CFLAGS) $(LDFLAGS) -o $@ $^
+
+bench: bench.c picohttpparser.c
 
 clean:
-	rm -f test-bin
+	rm -f bench test-bin
 
-.PHONY: test
+.PHONY: all clean test
