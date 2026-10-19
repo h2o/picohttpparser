@@ -63,6 +63,36 @@ for (i = 0; i != num_headers; ++i) {
 }
 ```
 
+### Accessing header names and values
+
+The method, path, header names, and header values are slices of the input buffer,
+not NUL-terminated strings. Keep the buffer alive and unchanged while using them.
+Use their corresponding lengths when printing or copying; `%s`, `strlen`, and
+`strcmp` cannot be used directly on these slices.
+
+Header names are case-insensitive. Match the full name length as well as its
+contents so that, for example, `Host-Extra` does not match `Host`. After a
+successful parse, this POSIX example prints each `Host` value:
+
+```c
+#include <stdio.h>
+#include <strings.h> /* strncasecmp */
+
+for (size_t i = 0; i != num_headers; ++i) {
+    if (headers[i].name != NULL && headers[i].name_len == sizeof("Host") - 1 &&
+        strncasecmp(headers[i].name, "Host", headers[i].name_len) == 0) {
+        fwrite(headers[i].value, 1, headers[i].value_len, stdout);
+        fputc('\n', stdout);
+    }
+}
+```
+
+A header continuation has `name == NULL`; its value belongs to the preceding
+header. The example skips these entries and does not unfold values or enforce
+rules about repeated headers. Applications must apply those rules for the
+headers they consume. `strncasecmp` is a POSIX function; other platforms need an
+equivalent ASCII case-insensitive comparison.
+
 ### phr_parse_response, phr_parse_headers
 
 `phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
