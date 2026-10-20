@@ -447,6 +447,30 @@ static void test_chunked_consume_trailer(void)
         chunked_test_runners[i](__LINE__, 1, "b\r\nhello world\r\n0\r\n\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 1, "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\nc: d\n\n", "hello world", 0);
     }
+
+    /* A CR at the end of the trailers must be followed by LF, even when split across calls. */
+    {
+        const char invalid[] = "0\r\n\r\r\n";
+        struct phr_chunked_decoder dec = {0};
+        char buf[sizeof(invalid)];
+        size_t bufsz = sizeof(invalid) - 1;
+        ssize_t ret;
+
+        dec.consume_trailer = 1;
+        memcpy(buf, invalid, sizeof(invalid));
+        ok(phr_decode_chunked(&dec, buf, &bufsz) == -1);
+
+        memset(&dec, 0, sizeof(dec));
+        dec.consume_trailer = 1;
+        for (i = 0; i < sizeof(invalid) - 1; ++i) {
+            buf[0] = invalid[i];
+            bufsz = 1;
+            ret = phr_decode_chunked(&dec, buf, &bufsz);
+            if (ret != -2)
+                break;
+        }
+        ok(ret == -1);
+    }
 }
 
 static void test_chunked_leftdata(void)
