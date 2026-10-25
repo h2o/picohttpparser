@@ -528,6 +528,7 @@ int phr_parse_headers(const char *buf_start, size_t len, struct phr_header *head
 
 enum {
     CHUNKED_IN_CHUNK_SIZE,
+    CHUNKED_IN_CHUNK_BWS,
     CHUNKED_IN_CHUNK_EXT,
     CHUNKED_IN_CHUNK_HEADER_EXPECT_LF,
     CHUNKED_IN_CHUNK_DATA,
@@ -591,6 +592,20 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
                 ++decoder->_hex_count;
             }
             decoder->_hex_count = 0;
+            decoder->_state = CHUNKED_IN_CHUNK_BWS;
+        /* fallthru */
+        case CHUNKED_IN_CHUNK_BWS:
+            /* whitespace after the chunk size can only be followed by a chunk extension or the end of the line */
+            for (;; ++src) {
+                if (src == bufsz)
+                    goto Exit;
+                if (!(buf[src] == ' ' || buf[src] == '\011'))
+                    break;
+            }
+            if (!(buf[src] == ';' || buf[src] == '\015')) {
+                ret = -1;
+                goto Exit;
+            }
             decoder->_state = CHUNKED_IN_CHUNK_EXT;
         /* fallthru */
         case CHUNKED_IN_CHUNK_EXT:
