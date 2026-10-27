@@ -247,6 +247,12 @@ static void test_response(void)
     PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
     PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
     PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
+    PARSE("HTTP/1.1 099 OK\r\n\r\n", 0, -1, "status code below 100");
+    PARSE("HTTP/1.1 600 OK\r\n\r\n", 0, -1, "status code above 599");
+    PARSE("HTTP/1.1 100 OK\r\n\r\n", 0, 0, "status code 100");
+    ok(status == 100);
+    PARSE("HTTP/1.1 599 OK\r\n\r\n", 0, 0, "status code 599");
+    ok(status == 599);
 
     PARSE("HTTP/1.1 200\r\n\r\n", 0, 0, "accept missing trailing whitespace in status-line");
     ok(bufis(msg, msg_len, ""));

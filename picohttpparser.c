@@ -230,8 +230,8 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
     return NULL;
 }
 
-#define PARSE_INT(valp_, mul_)                                                                                                     \
-    if (*buf < '0' || '9' < *buf) {                                                                                                \
+#define PARSE_INT(valp_, mul_, min_, max_)                                                                                         \
+    if (*buf < (min_) || (max_) < *buf) {                                                                                          \
         buf++;                                                                                                                     \
         *ret = -1;                                                                                                                 \
         return NULL;                                                                                                               \
@@ -241,11 +241,11 @@ static const char *is_complete(const char *buf, const char *buf_end, size_t last
 #define PARSE_INT_3(valp_)                                                                                                         \
     do {                                                                                                                           \
         int res_ = 0;                                                                                                              \
-        PARSE_INT(&res_, 100)                                                                                                      \
+        PARSE_INT(&res_, 100, '1', '5')                                                                                            \
         *valp_ = res_;                                                                                                             \
-        PARSE_INT(&res_, 10)                                                                                                       \
+        PARSE_INT(&res_, 10, '0', '9')                                                                                             \
         *valp_ += res_;                                                                                                            \
-        PARSE_INT(&res_, 1)                                                                                                        \
+        PARSE_INT(&res_, 1, '0', '9')                                                                                              \
         *valp_ += res_;                                                                                                            \
     } while (0)
 
@@ -299,7 +299,7 @@ static const char *parse_http_version(const char *buf, const char *buf_end, int 
     EXPECT_CHAR_NO_CHECK('/');
     EXPECT_CHAR_NO_CHECK('1');
     EXPECT_CHAR_NO_CHECK('.');
-    PARSE_INT(minor_version, 1);
+    PARSE_INT(minor_version, 1, '0', '9');
     return buf;
 }
 
