@@ -534,6 +534,7 @@ enum {
     CHUNKED_IN_CHUNK_DATA_EXPECT_CR,
     CHUNKED_IN_CHUNK_DATA_EXPECT_LF,
     CHUNKED_IN_TRAILERS_LINE_HEAD,
+    CHUNKED_IN_TRAILERS_END_EXPECT_LF,
     CHUNKED_IN_TRAILERS_LINE_MIDDLE
 };
 
@@ -665,14 +666,17 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
             decoder->_state = CHUNKED_IN_CHUNK_SIZE;
             break;
         case CHUNKED_IN_TRAILERS_LINE_HEAD:
-            for (;; ++src) {
-                if (src == bufsz)
-                    goto Exit;
-                if (buf[src] != '\015')
-                    break;
-            }
-            if (buf[src++] == '\012')
+            if (src == bufsz)
+                goto Exit;
+            if (buf[src] == '\012') {
+                ++src;
                 goto Complete;
+            }
+            if (buf[src] == '\015') {
+                ++src;
+                decoder->_state = CHUNKED_IN_TRAILERS_END_EXPECT_LF;
+                break;
+            }
             decoder->_state = CHUNKED_IN_TRAILERS_LINE_MIDDLE;
         /* fallthru */
         case CHUNKED_IN_TRAILERS_LINE_MIDDLE:
@@ -685,6 +689,14 @@ ssize_t phr_decode_chunked(struct phr_chunked_decoder *decoder, char *buf, size_
             ++src;
             decoder->_state = CHUNKED_IN_TRAILERS_LINE_HEAD;
             break;
+        case CHUNKED_IN_TRAILERS_END_EXPECT_LF:
+            if (src == bufsz)
+                goto Exit;
+            if (buf[src++] != '\012') {
+                ret = -1;
+                goto Exit;
+            }
+            goto Complete;
         default:
             assert(!"decoder is corrupt");
         }
