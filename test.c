@@ -417,6 +417,7 @@ static void test_chunked(void)
         chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6;comment=hi\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6 ; comment\r\nhello \r\n5\r\nworld\r\n0\r\n", "hello world", 0);
+        chunked_test_runners[i](__LINE__, 0, "6 \t;comment\r\nhello \r\n5\t\r\nworld\r\n0 \r\n", "hello world", 0);
         chunked_test_runners[i](__LINE__, 0, "6\r\nhello \r\n5\r\nworld\r\n0\r\na: b\r\nc: d\r\n\r\n", "hello world",
                                 sizeof("a: b\r\nc: d\r\n\r\n") - 1);
         chunked_test_runners[i](__LINE__, 0, "b\r\nhello world\r\n0\r\n", "hello world", 0);
@@ -429,6 +430,11 @@ static void test_chunked(void)
         test_chunked_failure(__LINE__, "6\r\nhello \r\nfffffffffffffffff\r\nabcdefg", -1);
     }
     test_chunked_failure(__LINE__, "1x\r\na\r\n0\r\n", -1);
+    /* only a chunk extension or the end of the line may follow whitespace after the chunk size */
+    test_chunked_failure(__LINE__, "1 x\r\na\r\n0\r\n", -1);
+    test_chunked_failure(__LINE__, "1 2\r\na\r\n0\r\n", -1);
+    test_chunked_failure(__LINE__, "1\t=\r\na\r\n0\r\n", -1);
+    test_chunked_failure(__LINE__, "1\r\na\r\n0 x\r\n", -1);
 
     /* bare lf cannot be used in chunk header */
     test_chunked_failure(__LINE__, "6\nhello \r\n5\r\nworld\r\n0\r\n", -1);
