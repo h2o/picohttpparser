@@ -107,8 +107,13 @@ for (size_t i = 0; i != num_headers; ++i) {
         continue;
     fwrite(headers[i].value, 1, headers[i].value_len, stdout);
     for (size_t j = i + 1; j != num_headers && headers[j].name == NULL; ++j) {
+        /* The parser preserves leading SP / HTAB on continuation lines. */
+        size_t start = 0;
+        while (start != headers[j].value_len &&
+               (headers[j].value[start] == ' ' || headers[j].value[start] == '\t'))
+            ++start;
         fputc(' ', stdout);
-        fwrite(headers[j].value, 1, headers[j].value_len, stdout);
+        fwrite(headers[j].value + start, 1, headers[j].value_len - start, stdout);
     }
     fputc('\n', stdout);
 }
