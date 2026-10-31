@@ -63,6 +63,68 @@ for (i = 0; i != num_headers; ++i) {
 }
 ```
 
+### Accessing header names and values
+
+The method, path, header names, and header values are slices of the input buffer,
+not NUL-terminated strings. Keep the buffer alive and unchanged while using them.
+Use their corresponding lengths when printing or copying; `%s`, `strlen`, and
+`strcmp` cannot be used directly on these slices.
+
+Header names are case-insensitive under RFC 9110, which hard-codes ASCII. Do not
+use locale-dependent functions such as `strcasecmp` / `strncasecmp`. Match the
+full name length as well as its contents so that, for example, `Host-Extra` does
+not match `Host`. After a successful parse, this example prints each `Host`
+value with an ASCII-only comparison:
+
+```c
+#include <stdio.h>
+
+static int ascii_hdr_eq(const char *name, size_t name_len,
+                        const char *literal /* lowercase ASCII */)
+{
+    size_t i, lit_len;
+    for (lit_len = 0; literal[lit_len] != '\0'; ++lit_len)
+        ;
+    if (name == NULL || name_len != lit_len)
+        return 0;
+    for (i = 0; i != name_len; ++i) {
+        unsigned char c = (unsigned char)name[i];
+        if (c >= 'A' && c <= 'Z')
+            c = (unsigned char)(c - 'A' + 'a');
+        if (c != (unsigned char)literal[i])
+            return 0;
+    }
+    return 1;
+}
+
+for (size_t i = 0; i != num_headers; ++i) {
+    /* RFC 9112 Section 5.2: unfold obs-fold lines, or reject the section.
+     * This example unfolds into the preceding header's printed value. */
+    if (headers[i].name == NULL) {
+        continue; /* handled when the preceding header was printed */
+    }
+    if (!ascii_hdr_eq(headers[i].name, headers[i].name_len, "host"))
+        continue;
+    fwrite(headers[i].value, 1, headers[i].value_len, stdout);
+    for (size_t j = i + 1; j != num_headers && headers[j].name == NULL; ++j) {
+        /* The parser preserves leading SP / HTAB on continuation lines. */
+        size_t start = 0;
+        while (start != headers[j].value_len &&
+               (headers[j].value[start] == ' ' || headers[j].value[start] == '\t'))
+            ++start;
+        fputc(' ', stdout);
+        fwrite(headers[j].value + start, 1, headers[j].value_len - start, stdout);
+    }
+    fputc('\n', stdout);
+}
+```
+
+A header continuation has `name == NULL`; its value belongs to the preceding
+header. Silently skipping those entries truncates the field. Applications must
+either unfold the value (as above) or reject the header section, per RFC 9112
+Section 5.2. The example does not enforce rules about repeated headers;
+applications must apply those for the headers they consume.
+
 ### phr_parse_response, phr_parse_headers
 
 `phr_parse_response` and `phr_parse_headers` provide similar interfaces as `phr_parse_request`.  `phr_parse_response` parses an HTTP response, and `phr_parse_headers` parses the headers only.
