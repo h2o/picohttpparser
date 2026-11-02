@@ -34,6 +34,14 @@
 #include <x86intrin.h>
 #endif
 #endif
+#if !defined(__SSE4_2__) && (defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+/* SSE2 is part of the x86-64 baseline, so this path needs no compiler flags or runtime detection (SSE4.2 builds use PCMPESTRI) */
+#define PHR_USE_SSE2 1
+#include <emmintrin.h>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+#endif
 #include "picohttpparser.h"
 
 #if __GNUC__ >= 3
@@ -96,6 +104,13 @@
             }                                                                                                                      \
             ++buf;                                                                                                                 \
             CHECK_EOF();                                                                                                           \
+            if (buf - tok_start == 8) {                                                                                            \
+                /* the target is at least 8 bytes long: scan the rest 16 bytes at a time */                                        \
+                buf = findchar_ctl_fast(buf, buf_end, 1, &found2);                                                                 \
+                if (!found2) {                                                                                                     \
+                    CHECK_EOF();                                                                                                   \
+                }                                                                                                                  \
+            }                                                                                                                      \
         }                                                                                                                          \
         tok = tok_start;                                                                                                           \
         toklen = buf - tok_start;                                                                                                  \
@@ -139,6 +154,38 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
     return buf;
 }
 
+/* Finds the first CTL (0x00-0x1f or 0x7f). If `stop_at_sp` is set, SP also ends the scan; if it is not, HT does not end it. Only
+ * whole 16-byte blocks are scanned; if none of them contains a match, `*found` is zero and the caller scans what is left. */
+static const char *findchar_ctl_fast(const char *buf, const char *buf_end, int stop_at_sp, int *found)
+{
+    *found = 0;
+#if PHR_USE_SSE2
+    const __m128i lo_max = _mm_set1_epi8(stop_at_sp ? '\040' : '\037'), ht = _mm_set1_epi8('\011'), del = _mm_set1_epi8('\177');
+    for (; buf_end - buf >= 16; buf += 16) {
+        __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
+        /* unsigned `b16 <= lo_max`, as SSE2 has no unsigned byte compare */
+        __m128i ctl = _mm_cmpeq_epi8(_mm_min_epu8(b16, lo_max), b16);
+        if (!stop_at_sp)
+            ctl = _mm_andnot_si128(_mm_cmpeq_epi8(b16, ht), ctl);
+        int mask = _mm_movemask_epi8(_mm_or_si128(ctl, _mm_cmpeq_epi8(b16, del)));
+        if (unlikely(mask != 0)) {
+#ifdef _MSC_VER
+            unsigned long r;
+            _BitScanForward(&r, (unsigned long)mask);
+#else
+            int r = __builtin_ctz(mask);
+#endif
+            *found = 1;
+            return buf + r;
+        }
+    }
+#else
+    (void)buf_end;
+    (void)stop_at_sp;
+#endif
+    return buf;
+}
+
 static const char *get_token_to_eol(const char *buf, const char *buf_end, const char **token, size_t *token_len, int *ret)
 {
     const char *token_start = buf;
@@ -152,6 +199,7 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
     if (found)
         goto FOUND_CTL;
 #else
+    int found;
     /* find non-printable char within the next 8 bytes, this is the hottest code; manually inlined */
     while (likely(buf_end - buf >= 8)) {
 #define DOIT()                                                                                                                     \
@@ -169,6 +217,10 @@ static const char *get_token_to_eol(const char *buf, const char *buf_end, const 
         DOIT();
         DOIT();
 #undef DOIT
+        /* 8 printable bytes in a row: scan ahead 16 bytes at a time */
+        buf = findchar_ctl_fast(buf, buf_end, 0, &found);
+        if (found)
+            goto FOUND_CTL;
         continue;
     NonPrintable:
         if ((likely((unsigned char)*buf < '\040') && likely(*buf != '\011')) || unlikely(*buf == '\177')) {
